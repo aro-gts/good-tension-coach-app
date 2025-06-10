@@ -1,0 +1,116 @@
+/* --- General Body Styles --- */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: #f0f2f5; /* A light grey background */
+    color: #333;
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+/* --- Main container for both login and app screens --- */
+#login-screen, #app-screen {
+    background-color: #ffffff;
+    padding: 40px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 600px;
+    box-sizing: border-box;
+}
+
+/* --- Login Screen Specific Styles --- */
+#login-screen header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+#login-screen h1 {
+    font-size: 2em;
+    color: #1a73e8; /* A nice blue */
+    margin: 0;
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px; /* Creates space between form elements */
+}
+
+input[type="email"], input[type="password"] {
+    padding: 12px;
+    font-size: 1em;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+button {
+    padding: 12px;
+    font-size: 1.1em;
+    font-weight: bold;
+    color: #fff;
+    background-color: #1a73e8; /* Blue button */
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+button:hover {
+    background-color: #1558b8; /* A darker blue on hover */
+}
+
+
+/* --- App Screen Specific Styles --- */
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 15px;
+    margin-bottom: 20px;
+}
+
+.app-header h2 {
+    margin: 0;
+    color: #333;
+}
+
+/* --- Chat Window Styles --- */
+#chat-messages {
+    height: 300px;
+    border: 1px solid #eee;
+    border-radius: 5px;
+    padding: 15px;
+    margin-bottom: 15px;
+    overflow-y: auto; /* Allows scrolling for messages */
+}
+
+.ai-message {
+    color: #555;
+    font-style: italic;
+}
+
+#chat-input-area {
+    display: flex;
+    gap: 10px;
+}
+
+#user-input {
+    flex-grow: 1; /* Makes the input field take up available space */
+    padding: 12px;
+    font-size: 1em;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+#send-button {
+    background-color: #28a745; /* A nice green for send */
+}
+
+#send-button:hover {
+    background-color: #218838;
+}
