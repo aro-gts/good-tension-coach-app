@@ -1,0 +1,12 @@
+{
+  "name": "good-tension-coach-app",
+  "version": "1.0.0",
+  "description": "AI Executive Coach for School Leaders",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
