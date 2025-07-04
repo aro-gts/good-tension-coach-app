@@ -1,29 +1,61 @@
 // --- Import Required Libraries ---
-// 'express' is a very popular and easy-to-use library for building web servers with Node.js
 const express = require('express');
-
-// 'path' helps us work with file and directory paths in a way that works on any operating system
 const path = require('path');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
+// --- Initialize the App & AI ---
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-// --- Initialize the App ---
-const app = express(); // Creates our main application object
-const PORT = process.env.PORT || 3000; // Sets the port for our server to listen on
+// Initialize the AI with the secret key from Render's environment variables
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-
-// --- Set Up Middleware ---
-// This is the magic line that tells our server to make the 'public' folder accessible to the web.
-// This is how our server will find and send the index.html and style.css files.
+// --- Middleware ---
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json()); // This allows our server to read JSON from requests
 
+// --- API Route for Chat ---
+// This is the new endpoint our app will send messages to
+app.post('/api/chat', async (req, res) => {
+    try {
+        // Get the full prompt and the user's message from the request
+        const { prompt, message } = req.body;
 
-// --- Define Routes (for later) ---
-// We will add our login and API routes here in the future.
-// For example: app.post('/login', ...);
+        if (!prompt || !message) {
+            return res.status(400).json({ error: 'Prompt and message are required.' });
+        }
 
+        // Start the AI model
+        const model = genAI.getGenerativeModel({ model: "gemini-pro"});
+
+        // Create a chat session with the Gem's prompt as the history
+        const chat = model.startChat({
+            history: [
+                {
+                    role: "user",
+                    parts: [{ text: prompt }],
+                },
+                {
+                    role: "model",
+                    parts: [{ text: "Understood. I am ready to begin our coaching session." }],
+                }
+            ],
+        });
+
+        const result = await chat.sendMessage(message);
+        const response = await result.response;
+        const text = response.text();
+
+        // Send the AI's reply back to the app
+        res.json({ reply: text });
+
+    } catch (error) {
+        console.error('AI Error:', error);
+        res.status(500).json({ error: 'Failed to get response from AI.' });
+    }
+});
 
 // --- Start the Server ---
-// This line tells our server to start listening for incoming requests on our specified port.
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
