@@ -1,52 +1,41 @@
-// --- Import Required Libraries ---
-const express = require('express');
-const path = require('path');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+// Use the modern 'import' syntax
+import express from 'express';
+import path from 'path';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // --- Initialize the App & AI ---
 const app = express();
 const PORT = process.env.PORT || 3000;
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
-// Initialize the AI with the secret key from Render's environment variables
+// Initialize the AI with the secret key
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // --- Middleware ---
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json()); // This allows our server to read JSON from requests
+app.use(express.json());
 
 // --- API Route for Chat ---
-// This is the new endpoint our app will send messages to
 app.post('/api/chat', async (req, res) => {
     try {
-        // Get the full prompt and the user's message from the request
         const { prompt, message } = req.body;
 
         if (!prompt || !message) {
             return res.status(400).json({ error: 'Prompt and message are required.' });
         }
 
-        // Start the AI model
-        const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro"});
-
-        // Create a chat session with the Gem's prompt as the history
+        const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
         const chat = model.startChat({
             history: [
-                {
-                    role: "user",
-                    parts: [{ text: prompt }],
-                },
-                {
-                    role: "model",
-                    parts: [{ text: "Understood. I am ready to begin our coaching session." }],
-                }
-            ],
+                { role: "user", parts: [{ text: prompt }] },
+                { role: "model", parts: [{ text: "Understood. I am ready to begin our coaching session." }] }
+            ]
         });
 
         const result = await chat.sendMessage(message);
         const response = await result.response;
         const text = response.text();
 
-        // Send the AI's reply back to the app
         res.json({ reply: text });
 
     } catch (error) {
