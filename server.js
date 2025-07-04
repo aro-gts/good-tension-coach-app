@@ -1,16 +1,17 @@
 // Use the modern 'import' syntax
 import express from 'express';
 import path from 'path';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 
 // --- Initialize the App & AI ---
 const app = express();
 const PORT = process.env.PORT || 3000;
-// A small fix to get the directory name when using ES modules
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
-// Initialize the AI with the secret key
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Initialize the OpenAI client with the secret key
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+});
 
 // --- Middleware ---
 app.use(express.static(path.join(__dirname, 'public')));
@@ -25,19 +26,19 @@ app.post('/api/chat', async (req, res) => {
             return res.status(400).json({ error: 'Prompt and message are required.' });
         }
 
-        // Initialize the model
-        const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
+        // Send the request to OpenAI's Chat Completions API
+        const completion = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo", // A powerful and cost-effective model
+            messages: [
+                { role: "system", content: prompt }, // The Gem's instructions
+                { role: "user", content: message }   // The user's message
+            ],
+        });
 
-        // Combine the system prompt and the user's message into a single prompt
-        const fullPrompt = `${prompt}\n\nUser: ${message}\nAI Coach:`;
-
-        // Generate content using the simpler, direct method
-        const result = await model.generateContent(fullPrompt);
-        const response = await result.response;
-        const text = response.text();
+        const reply = completion.choices[0].message.content;
         
         // Send the AI's reply back to the app
-        res.json({ reply: text });
+        res.json({ reply: reply });
 
     } catch (error) {
         console.error('AI Error:', error);
