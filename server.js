@@ -6,6 +6,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 // --- Initialize the App & AI ---
 const app = express();
 const PORT = process.env.PORT || 3000;
+// A small fix to get the directory name when using ES modules
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
 // Initialize the AI with the secret key
@@ -24,18 +25,18 @@ app.post('/api/chat', async (req, res) => {
             return res.status(400).json({ error: 'Prompt and message are required.' });
         }
 
+        // Initialize the model
         const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
-        const chat = model.startChat({
-            history: [
-                { role: "user", parts: [{ text: prompt }] },
-                { role: "model", parts: [{ text: "Understood. I am ready to begin our coaching session." }] }
-            ]
-        });
 
-        const result = await chat.sendMessage(message);
+        // Combine the system prompt and the user's message into a single prompt
+        const fullPrompt = `${prompt}\n\nUser: ${message}\nAI Coach:`;
+
+        // Generate content using the simpler, direct method
+        const result = await model.generateContent(fullPrompt);
         const response = await result.response;
         const text = response.text();
-
+        
+        // Send the AI's reply back to the app
         res.json({ reply: text });
 
     } catch (error) {
