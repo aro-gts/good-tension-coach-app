@@ -3,6 +3,7 @@ import { supabase } from './client.js';
 
 // --- Global Variables ---
 let activeGem = null;
+let userProfile = null;
 
 // --- Get HTML Elements ---
 const gemSelectionContainer = document.getElementById('gem-selection');
@@ -14,17 +15,46 @@ const micButton = document.getElementById('mic-button');
 const appHeader = document.querySelector('.app-header h2');
 
 // --- Main Functions ---
+
+// 1. Get the current user's profile and subscription status
+async function loadUserProfile() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('subscription_status')
+            .eq('id', user.id)
+            .single();
+
+        if (error) {
+            console.error('Error fetching profile:', error);
+        } else {
+            userProfile = data;
+            loadGems(); // Once we have the profile, load the appropriate gems
+        }
+    }
+}
+
+// 2. Load Gems from the Database based on subscription status
 async function loadGems() {
-    const { data, error } = await supabase.from('gems').select('*');
+    let query = supabase.from('gems').select('*');
+
+    // If the user is on the free plan, only show the "Mind Over Muddle" Gem
+    if (userProfile && userProfile.subscription_status === 'free') {
+        query = query.eq('name', 'Mind Over Muddle: Uncomplicating Your Leadership Brain');
+    }
+
+    const { data, error } = await query;
+
     if (error) {
         console.error('Error fetching gems:', error);
         gemSelectionContainer.innerHTML = `<p style="color: red;">Error loading coaches: ${error.message}</p>`;
     } else {
-        console.log('Fetched data:', data); // Add this line for debugging
         displayGems(data);
     }
 }
 
+// 3. Display Gems as Buttons
 function displayGems(gems) {
     gemSelectionContainer.innerHTML = '<h3>Select a Coach</h3>';
     if (gems && gems.length > 0) {
@@ -36,8 +66,10 @@ function displayGems(gems) {
             gemSelectionContainer.appendChild(button);
         });
     }
+    // We will add an "Upgrade" button here later for free users
 }
 
+// 4. Handle Gem Selection
 function selectGem(gem) {
     activeGem = gem;
     gemSelectionContainer.style.display = 'none';
@@ -46,11 +78,10 @@ function selectGem(gem) {
     addMessageToChat('Gemini Gem', `You've selected the "${activeGem.name}" coach. How can I help you today?`);
 }
 
+// 5. Handle Sending a Message
 async function handleSendMessage() {
     const messageText = userInput.value.trim();
-    if (messageText === '' || !activeGem) {
-        return;
-    }
+    if (messageText === '' || !activeGem) return;
 
     addMessageToChat('You', messageText);
     userInput.value = '';
@@ -61,13 +92,8 @@ async function handleSendMessage() {
     try {
         const response = await fetch('/api/chat', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                prompt: activeGem.prompt,
-                message: messageText
-            }),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: activeGem.prompt, message: messageText }),
         });
 
         if (!response.ok) {
@@ -143,10 +169,16 @@ if (SpeechRecognition) {
 // --- Event Listeners ---
 sendButton.addEventListener('click', handleSendMessage);
 userInput.addEventListener('keypress', (event) => {
-    if (event.key === 'Enter') {
-        handleSendMessage();
-    }
+    if (event.key === 'Enter') handleSendMessage();
 });
 
 // --- Initial Load ---
-loadGems();
+// This now starts the chain: check the user's auth state, then load their profile, then load their gems.
+supabase.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_IN') {
+        loadUserProfile();
+    }
+});
+
+// Also check on initial page load in case the user is already signed in
+loadUserProfile();
