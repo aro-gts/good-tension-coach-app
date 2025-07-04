@@ -14,15 +14,15 @@
             <p>Your Personalized Executive Coaching Partner</p>
         </header>
         <main>
-           <div class="login-form">
-    <h2>Login or Sign Up</h2>
-    <input type="email" placeholder="Email Address" id="email-input">
-    <input type="password" placeholder="Password" id="password-input">
-    <div class="button-group">
-        <button id="login-button">Login</button>
-        <button id="signup-button" class="secondary">Sign Up</button>
-    </div>
-</div>
+            <div class="login-form">
+                <h2>Login or Sign Up</h2>
+                <input type="email" placeholder="Email Address" id="email-input">
+                <input type="password" placeholder="Password" id="password-input">
+                <div class="button-group">
+                    <button id="login-button">Login</button>
+                    <button id="signup-button" class="secondary">Sign Up</button>
+                </div>
+            </div>
         </main>
     </div>
 
@@ -35,21 +35,22 @@
         <main class="chat-container">
             <div id="gem-selection">
                 <h3>Select a Coach</h3>
-                </div>
+            </div>
             
-            <div id="chat-window">
+            <div id="chat-window" style="display: none;">
                 <div id="chat-messages">
-                    <p class="ai-message">Welcome! Please select a coach to begin.</p>
-                </div>
+                    </div>
                 <div id="chat-input-area">
-                    <input type="text" id="user-input" placeholder="Type your message here...">
+                    <input type="text" id="user-input" placeholder="Type or click the mic to speak...">
+                    <button id="mic-button" style="display: none;">🎤</button>
                     <button id="send-button">Send</button>
                 </div>
             </div>
         </main>
     </div>
-        <script type="module" src="client.js"></script>
-        <script type="module" src="auth.js"></script>
-        <script type="module" src="ai.js"></script>
-    </body>
+
+    <script type="module" src="client.js"></script>
+    <script type="module" src="auth.js"></script>
+    <script type="module" src="ai.js"></script>
+</body>
 </html>
