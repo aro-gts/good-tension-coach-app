@@ -20,19 +20,22 @@ async function loadGems() {
         console.error('Error fetching gems:', error);
         gemSelectionContainer.innerHTML = `<p style="color: red;">Error loading coaches: ${error.message}</p>`;
     } else {
+        console.log('Fetched data:', data); // Add this line for debugging
         displayGems(data);
     }
 }
 
-function displayGms(gems) {
+function displayGems(gems) {
     gemSelectionContainer.innerHTML = '<h3>Select a Coach</h3>';
-    gems.forEach(gem => {
-        const button = document.createElement('button');
-        button.innerText = gem.name;
-        button.classList.add('gem-button');
-        button.addEventListener('click', () => selectGem(gem));
-        gemSelectionContainer.appendChild(button);
-    });
+    if (gems && gems.length > 0) {
+        gems.forEach(gem => {
+            const button = document.createElement('button');
+            button.innerText = gem.name;
+            button.classList.add('gem-button');
+            button.addEventListener('click', () => selectGem(gem));
+            gemSelectionContainer.appendChild(button);
+        });
+    }
 }
 
 function selectGem(gem) {
@@ -117,7 +120,6 @@ if (SpeechRecognition) {
     recognition.onresult = (event) => {
         const speechResult = event.results[0][0].transcript;
         userInput.value = speechResult;
-        // Automatically send the message after successful speech recognition
         handleSendMessage();
     };
 
@@ -137,7 +139,6 @@ if (SpeechRecognition) {
     console.log('Speech Recognition Not Supported');
     micButton.style.display = 'none';
 }
-
 
 // --- Event Listeners ---
 sendButton.addEventListener('click', handleSendMessage);
