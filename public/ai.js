@@ -3,7 +3,6 @@ import { supabase } from './client.js';
 
 // --- Global Variables ---
 let activeGem = null;
-let userProfile = null;
 
 // --- Get HTML Elements ---
 const gemSelectionContainer = document.getElementById('gem-selection');
@@ -15,37 +14,8 @@ const micButton = document.getElementById('mic-button');
 const appHeader = document.querySelector('.app-header h2');
 
 // --- Main Functions ---
-
-// 1. Get the current user's profile and subscription status
-async function loadUserProfile() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('subscription_status')
-            .eq('id', user.id)
-            .single();
-
-        if (error) {
-            console.error('Error fetching profile:', error);
-        } else {
-            userProfile = data;
-            loadGems(); // Once we have the profile, load the appropriate gems
-        }
-    }
-}
-
-// 2. Load Gems from the Database based on subscription status
 async function loadGems() {
-    let query = supabase.from('gems').select('*');
-
-    // If the user is on the free plan, only show the "Mind Over Muddle" Gem
-    if (userProfile && userProfile.subscription_status === 'free') {
-        query = query.eq('name', 'Mind Over Muddle: Uncomplicating Your Leadership Brain');
-    }
-
-    const { data, error } = await query;
-
+    const { data, error } = await supabase.from('gems').select('*');
     if (error) {
         console.error('Error fetching gems:', error);
         gemSelectionContainer.innerHTML = `<p style="color: red;">Error loading coaches: ${error.message}</p>`;
@@ -54,31 +24,37 @@ async function loadGems() {
     }
 }
 
-// 3. Display Gems as Buttons
 function displayGems(gems) {
     gemSelectionContainer.innerHTML = '<h3>Select a Coach</h3>';
     if (gems && gems.length > 0) {
         gems.forEach(gem => {
-            const button = document.createElement('button');
-            button.innerText = gem.name;
-            button.classList.add('gem-button');
-            button.addEventListener('click', () => selectGem(gem));
-            gemSelectionContainer.appendChild(button);
+            const card = document.createElement('div');
+            card.classList.add('gem-card');
+            card.addEventListener('click', () => selectGem(gem));
+            
+            const nameElement = document.createElement('h4');
+            nameElement.innerText = gem.name;
+            card.appendChild(nameElement);
+            
+            const descriptionElement = document.createElement('p');
+            descriptionElement.innerText = gem.description;
+            card.appendChild(descriptionElement);
+            
+            gemSelectionContainer.appendChild(card);
         });
     }
-    // We will add an "Upgrade" button here later for free users
 }
 
-// 4. Handle Gem Selection
 function selectGem(gem) {
     activeGem = gem;
     gemSelectionContainer.style.display = 'none';
     chatWindow.style.display = 'block';
     appHeader.innerText = activeGem.name;
+    // Clear any previous messages and add the initial prompt
+    chatMessages.innerHTML = ''; 
     addMessageToChat('Gemini Gem', `You've selected the "${activeGem.name}" coach. How can I help you today?`);
 }
 
-// 5. Handle Sending a Message
 async function handleSendMessage() {
     const messageText = userInput.value.trim();
     if (messageText === '' || !activeGem) return;
@@ -89,11 +65,27 @@ async function handleSendMessage() {
     sendButton.disabled = true;
     micButton.disabled = true;
 
+    // Create a history of the chat to send to the backend
+    const chatHistory = [];
+    const messages = chatMessages.querySelectorAll('p');
+    // We skip the first message, which is the initial welcome.
+    for (let i = 1; i < messages.length; i++) {
+        const msg = messages[i];
+        const fullText = msg.textContent || msg.innerText;
+        const senderText = msg.querySelector('strong').textContent;
+        const role = (senderText === 'You:') ? 'user' : 'model';
+        const content = fullText.substring(senderText.length).trim();
+        chatHistory.push({ role: role, content: content });
+    }
+
     try {
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: activeGem.prompt, message: messageText }),
+            body: JSON.stringify({
+                prompt: activeGem.prompt,
+                history: chatHistory
+            }),
         });
 
         if (!response.ok) {
@@ -128,7 +120,6 @@ function addMessageToChat(sender, text) {
 
 // --- Speech Recognition Logic ---
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
 if (SpeechRecognition) {
     micButton.style.display = 'inline-block';
     const recognition = new SpeechRecognition();
@@ -160,7 +151,6 @@ if (SpeechRecognition) {
         micButton.textContent = '🎤';
         micButton.disabled = false;
     };
-
 } else {
     console.log('Speech Recognition Not Supported');
     micButton.style.display = 'none';
@@ -173,12 +163,22 @@ userInput.addEventListener('keypress', (event) => {
 });
 
 // --- Initial Load ---
-// This now starts the chain: check the user's auth state, then load their profile, then load their gems.
 supabase.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_IN') {
         loadUserProfile();
     }
 });
+loadUserProfile(); // Also check on initial page load
 
-// Also check on initial page load in case the user is already signed in
-loadUserProfile();
+async function loadUserProfile() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+        const { data, error } = await supabase.from('profiles').select('subscription_status').eq('id', user.id).single();
+        if (error) {
+            console.error('Error fetching profile:', error);
+        } else {
+            userProfile = data;
+            loadGems();
+        }
+    }
+}
