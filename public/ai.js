@@ -28,23 +28,28 @@ function displayGems(gems) {
     gemSelectionContainer.innerHTML = '<h3>Select a Coach</h3>';
     if (gems && gems.length > 0) {
         gems.forEach(gem => {
+            // Create a container 'card' for each gem
             const card = document.createElement('div');
             card.classList.add('gem-card');
             card.addEventListener('click', () => selectGem(gem));
-            
+
+            // Create and add the Gem name as a heading
             const nameElement = document.createElement('h4');
             nameElement.innerText = gem.name;
             card.appendChild(nameElement);
-            
+
+            // Create and add the Gem description as a paragraph
             const descriptionElement = document.createElement('p');
-            descriptionElement.innerText = gem.description;
+            descriptionElement.innerText = gem.description; // Using the description from the database
             card.appendChild(descriptionElement);
-            
+
+            // Add the whole card to the container
             gemSelectionContainer.appendChild(card);
         });
     }
+    
+    // We will add an "Upgrade" button here later for free users
 }
-
 function selectGem(gem) {
     activeGem = gem;
     gemSelectionContainer.style.display = 'none';
