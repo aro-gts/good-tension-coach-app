@@ -23,10 +23,10 @@ app.post('/api/chat', async (req, res) => {
         const { prompt, history } = req.body;
 
         if (!prompt || !history) {
-            return res.status(400).json({ error: 'Prompt and message are required.' });
+            return res.status(400).json({ error: 'Prompt and history are required.' });
         }
 
-        // THE FIX IS HERE: The main prompt must have the 'system' role.
+        // Combine the main system prompt with the ongoing chat history
         const messages = [
             { role: "system", content: prompt }, 
             ...history 
@@ -34,12 +34,12 @@ app.post('/api/chat', async (req, res) => {
 
         // Send the request to OpenAI's Chat Completions API
         const completion = await openai.chat.completions.create({
-            model: "gpt-3.5-turbo",
+            model: "gpt-4o-mini", // Using a more advanced model
             messages: messages,
         });
 
         const reply = completion.choices[0].message.content;
-        
+
         res.json({ reply: reply });
 
     } catch (error) {
