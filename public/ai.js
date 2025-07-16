@@ -25,14 +25,13 @@ async function loadUserProfile() {
             userProfile = data;
         }
     }
-    // Always load gems regardless of profile status initially
     loadGems();
 }
 
-async function loadGms() {
+async function loadGems() {
     let query = supabase.from('gems').select('*');
 
-    if (userProfile && userProfile.subscription_status === 'free') {
+    if (!userProfile || userProfile.subscription_status === 'free') {
         query = query.eq('name', 'Mind Over Muddle: Uncomplicating Your Leadership Brain');
     }
 
@@ -88,12 +87,13 @@ async function handleSendMessage() {
     // Create a history of the chat to send to the backend
     const chatHistory = [];
     const messages = chatMessages.querySelectorAll('p');
+    
     // We skip the first message, which is the initial welcome.
     for (let i = 1; i < messages.length; i++) {
         const msg = messages[i];
         const fullText = msg.textContent || msg.innerText;
         const senderText = msg.querySelector('strong').textContent;
-        // THE FIX IS HERE: The AI's role must be 'assistant'
+        // THE FIX IS HERE: The AI's role must be 'assistant' for OpenAI
         const role = (senderText === 'You:') ? 'user' : 'assistant'; 
         const content = fullText.substring(senderText.length).trim();
         chatHistory.push({ role: role, content: content });
@@ -190,11 +190,8 @@ userInput.addEventListener('keypress', (event) => {
 
 // --- Initial Load ---
 supabase.auth.onAuthStateChange((event, session) => {
-    if (session) { // If user is signed in or state changes
+    if (session) {
         loadUserProfile();
-    } else { // If user is signed out
-        // Potentially handle UI changes for logged out state if needed
     }
 });
-// Initial check when the page first loads
 loadUserProfile();
