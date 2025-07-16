@@ -26,9 +26,9 @@ app.post('/api/chat', async (req, res) => {
             return res.status(400).json({ error: 'Prompt and message are required.' });
         }
 
-        // The first message is from the user role, containing the Gem's instructions
+        // THE FIX IS HERE: The main prompt must have the 'system' role.
         const messages = [
-            { role: "user", content: prompt },
+            { role: "system", content: prompt }, 
             ...history 
         ];
 
