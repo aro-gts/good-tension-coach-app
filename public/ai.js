@@ -3,7 +3,6 @@ import { supabase } from './client.js';
 
 // --- Global Variables ---
 let activeGem = null;
-let userProfile = null;
 
 // --- Get HTML Elements ---
 const gemSelectionContainer = document.getElementById('gem-selection');
@@ -15,25 +14,10 @@ const micButton = document.getElementById('mic-button');
 const appHeader = document.querySelector('.app-header h2');
 
 // --- Main Functions ---
-async function loadUserProfile() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-        const { data, error } = await supabase.from('profiles').select('subscription_status').eq('id', user.id).single();
-        if (error && error.code !== 'PGRST116') {
-            console.error('Error fetching profile:', error);
-        } else {
-            userProfile = data;
-        }
-    }
-    loadGems();
-}
-
 async function loadGems() {
-    let query = supabase.from('gems').select('*');
-    if (!userProfile || userProfile.subscription_status === 'free') {
-         query = query.eq('name', 'Mind Over Muddle: Uncomplicating Your Leadership Brain');
-    }
-    const { data, error } = await query;
+    // This simplified query fetches ALL gems from the database.
+    const { data, error } = await supabase.from('gems').select('*');
+
     if (error) {
         console.error('Error fetching gems:', error);
         gemSelectionContainer.innerHTML = `<p style="color: red;">Error loading coaches: ${error.message}</p>`;
@@ -49,12 +33,15 @@ function displayGems(gems) {
             const card = document.createElement('div');
             card.classList.add('gem-card');
             card.addEventListener('click', () => selectGem(gem));
+
             const nameElement = document.createElement('h4');
             nameElement.innerText = gem.name;
             card.appendChild(nameElement);
+
             const descriptionElement = document.createElement('p');
             descriptionElement.innerText = gem.description;
             card.appendChild(descriptionElement);
+
             gemSelectionContainer.appendChild(card);
         });
     }
@@ -65,7 +52,7 @@ function selectGem(gem) {
     gemSelectionContainer.style.display = 'none';
     chatWindow.style.display = 'block';
     appHeader.innerText = activeGem.name;
-    chatMessages.innerHTML = '';
+    chatMessages.innerHTML = ''; // Clear previous chats
     addMessageToChat('Your AI Executive Coach', `You've selected the "${gem.name}" coach. How can I help you today?`);
 }
 
@@ -81,12 +68,10 @@ async function handleSendMessage() {
 
     const chatHistory = [];
     const messages = chatMessages.querySelectorAll('p');
-    // We skip the first message, which is the initial welcome.
     for (let i = 1; i < messages.length; i++) {
         const msg = messages[i];
         const fullText = msg.textContent || msg.innerText;
         const senderText = msg.querySelector('strong').textContent;
-        // THE FIX IS HERE: The AI's role must be 'assistant'
         const role = (senderText === 'You:') ? 'user' : 'assistant';
         const content = fullText.substring(senderText.length).trim();
         chatHistory.push({ role: role, content: content });
@@ -115,46 +100,4 @@ async function handleSendMessage() {
     }
 }
 
-function addMessageToChat(sender, text) {
-    const messageElement = document.createElement('p');
-    const strong = document.createElement('strong');
-    strong.textContent = `${sender}: `;
-    messageElement.appendChild(strong);
-    let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
-    const textSpan = document.createElement('span');
-    textSpan.innerHTML = formattedText;
-    messageElement.appendChild(textSpan);
-    chatMessages.appendChild(messageElement);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-if (SpeechRecognition) {
-    micButton.style.display = 'inline-block';
-    const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-    micButton.addEventListener('click', () => {
-        recognition.start();
-        micButton.textContent = '...';
-        micButton.disabled = true;
-    });
-    recognition.onresult = (event) => {
-        const speechResult = event.results[0][0].transcript;
-        userInput.value = speechResult;
-        handleSendMessage();
-    };
-    recognition.onspeechend = () => {
-        recognition.stop();
-        micButton.textContent = '🎤';
-        micButton.disabled = false;
-    };
-    recognition.onerror = (event) => {
-        alert('Speech recognition error detected: ' + event.error);
-        micButton.textContent = '🎤';
-        micButton.disabled = false;
-    };
-} else {
-    console.log
+function add
