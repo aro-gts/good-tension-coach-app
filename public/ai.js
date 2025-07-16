@@ -30,11 +30,9 @@ async function loadUserProfile() {
 
 async function loadGems() {
     let query = supabase.from('gems').select('*');
-
     if (!userProfile || userProfile.subscription_status === 'free') {
         query = query.eq('name', 'Mind Over Muddle: Uncomplicating Your Leadership Brain');
     }
-
     const { data, error } = await query;
     if (error) {
         console.error('Error fetching gems:', error);
@@ -51,15 +49,12 @@ function displayGems(gems) {
             const card = document.createElement('div');
             card.classList.add('gem-card');
             card.addEventListener('click', () => selectGem(gem));
-            
             const nameElement = document.createElement('h4');
             nameElement.innerText = gem.name;
             card.appendChild(nameElement);
-            
             const descriptionElement = document.createElement('p');
             descriptionElement.innerText = gem.description;
             card.appendChild(descriptionElement);
-            
             gemSelectionContainer.appendChild(card);
         });
     }
@@ -71,52 +66,39 @@ function selectGem(gem) {
     chatWindow.style.display = 'block';
     appHeader.innerText = activeGem.name;
     chatMessages.innerHTML = '';
-    addMessageToChat('Gemini Gem', `You've selected the "${gem.name}" coach. How can I help you today?`);
+    addMessageToChat('Your AI Executive Coach', `You've selected the "${gem.name}" coach. How can I help you today?`);
 }
 
 async function handleSendMessage() {
     const messageText = userInput.value.trim();
     if (messageText === '' || !activeGem) return;
-
     addMessageToChat('You', messageText);
     userInput.value = '';
     userInput.disabled = true;
     sendButton.disabled = true;
     micButton.disabled = true;
-
-    // Create a history of the chat to send to the backend
     const chatHistory = [];
     const messages = chatMessages.querySelectorAll('p');
-    
-    // We skip the first message, which is the initial welcome.
     for (let i = 1; i < messages.length; i++) {
         const msg = messages[i];
         const fullText = msg.textContent || msg.innerText;
         const senderText = msg.querySelector('strong').textContent;
-        // THE FIX IS HERE: The AI's role must be 'assistant' for OpenAI
-        const role = (senderText === 'You:') ? 'user' : 'assistant'; 
+        const role = (senderText === 'You:') ? 'user' : 'assistant';
         const content = fullText.substring(senderText.length).trim();
         chatHistory.push({ role: role, content: content });
     }
-
     try {
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                prompt: activeGem.prompt,
-                history: chatHistory
-            }),
+            body: JSON.stringify({ prompt: activeGem.prompt, history: chatHistory }),
         });
-
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.error || 'Network response was not ok.');
         }
-
         const data = await response.json();
-        addMessageToChat('Gemini Gem', data.reply);
-
+        addMessageToChat('Your AI Executive Coach', data.reply);
     } catch (error) {
         console.error('Error sending message:', error);
         addMessageToChat('System', `Sorry, an error occurred: ${error.message}`);
@@ -128,70 +110,4 @@ async function handleSendMessage() {
     }
 }
 
-// --- Helper Functions ---
-function addMessageToChat(sender, text) {
-    const messageElement = document.createElement('p');
-    const strong = document.createElement('strong');
-    strong.textContent = `${sender}: `;
-    messageElement.appendChild(strong);
-    
-    let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
-    const textSpan = document.createElement('span');
-    textSpan.innerHTML = formattedText;
-    messageElement.appendChild(textSpan);
-    
-    chatMessages.appendChild(messageElement);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
-// --- Speech Recognition Logic ---
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-if (SpeechRecognition) {
-    micButton.style.display = 'inline-block';
-    const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    micButton.addEventListener('click', () => {
-        recognition.start();
-        micButton.textContent = '...';
-        micButton.disabled = true;
-    });
-
-    recognition.onresult = (event) => {
-        const speechResult = event.results[0][0].transcript;
-        userInput.value = speechResult;
-        handleSendMessage();
-    };
-
-    recognition.onspeechend = () => {
-        recognition.stop();
-        micButton.textContent = '🎤';
-        micButton.disabled = false;
-    };
-
-    recognition.onerror = (event) => {
-        alert('Speech recognition error detected: ' + event.error);
-        micButton.textContent = '🎤';
-        micButton.disabled = false;
-    };
-} else {
-    console.log('Speech Recognition Not Supported');
-    micButton.style.display = 'none';
-}
-
-// --- Event Listeners ---
-sendButton.addEventListener('click', handleSendMessage);
-userInput.addEventListener('keypress', (event) => {
-    if (event.key === 'Enter') handleSendMessage();
-});
-
-// --- Initial Load ---
-supabase.auth.onAuthStateChange((event, session) => {
-    if (session) {
-        loadUserProfile();
-    }
-});
-loadUserProfile();
+function addMessageToChat(
