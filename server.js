@@ -15,7 +15,7 @@ const openai = new OpenAI({
 
 // --- Middleware ---
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json()); // This allows our server to read JSON from requests
+app.use(express.json());
 
 // --- API Route for Chat ---
 app.post('/api/chat', async (req, res) => {
@@ -23,12 +23,12 @@ app.post('/api/chat', async (req, res) => {
         const { prompt, history } = req.body;
 
         if (!prompt || !history) {
-            return res.status(400).json({ error: 'Prompt and history are required.' });
+            return res.status(400).json({ error: 'Prompt and message are required.' });
         }
 
-        // Combine the main prompt with the ongoing chat history
+        // The first message is from the user role, containing the Gem's instructions
         const messages = [
-            { role: "user", content: prompt }, // The Gem's instructions are the first user message
+            { role: "user", content: prompt },
             ...history 
         ];
 
@@ -40,7 +40,6 @@ app.post('/api/chat', async (req, res) => {
 
         const reply = completion.choices[0].message.content;
         
-        // Send the AI's reply back to the app
         res.json({ reply: reply });
 
     } catch (error) {
