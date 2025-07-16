@@ -8,14 +8,14 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
-// Initialize the OpenAI client with the secret key
+// Initialize the OpenAI client with the secret key from Render
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
 
 // --- Middleware ---
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json());
+app.use(express.json()); // This allows our server to read JSON from requests
 
 // --- API Route for Chat ---
 app.post('/api/chat', async (req, res) => {
@@ -26,9 +26,10 @@ app.post('/api/chat', async (req, res) => {
             return res.status(400).json({ error: 'Prompt and history are required.' });
         }
 
+        // Combine the main prompt with the ongoing chat history
         const messages = [
-            { role: "system", content: prompt },
-            ...history
+            { role: "user", content: prompt }, // The Gem's instructions are the first user message
+            ...history 
         ];
 
         // Send the request to OpenAI's Chat Completions API
@@ -38,13 +39,13 @@ app.post('/api/chat', async (req, res) => {
         });
 
         const reply = completion.choices[0].message.content;
-
+        
+        // Send the AI's reply back to the app
         res.json({ reply: reply });
 
     } catch (error) {
         console.error('AI Error:', error);
-        // Send back a more detailed error message to the frontend
-        res.status(500).json({ error: 'Failed to get response from AI.', details: error.message });
+        res.status(500).json({ error: 'Failed to get response from AI.' });
     }
 });
 
