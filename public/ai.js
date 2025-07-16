@@ -15,7 +15,9 @@ const appHeader = document.querySelector('.app-header h2');
 
 // --- Main Functions ---
 async function loadGems() {
+    // This query fetches ALL gems from the database.
     const { data, error } = await supabase.from('gems').select('*');
+
     if (error) {
         console.error('Error fetching gems:', error);
         gemSelectionContainer.innerHTML = `<p style="color: red;">Error loading coaches: ${error.message}</p>`;
@@ -28,36 +30,30 @@ function displayGems(gems) {
     gemSelectionContainer.innerHTML = '<h3>Select a Coach</h3>';
     if (gems && gems.length > 0) {
         gems.forEach(gem => {
-            // Create a container 'card' for each gem
             const card = document.createElement('div');
             card.classList.add('gem-card');
             card.addEventListener('click', () => selectGem(gem));
-
-            // Create and add the Gem name as a heading
+            
             const nameElement = document.createElement('h4');
             nameElement.innerText = gem.name;
             card.appendChild(nameElement);
-
-            // Create and add the Gem description as a paragraph
+            
             const descriptionElement = document.createElement('p');
-            descriptionElement.innerText = gem.description; // Using the description from the database
+            descriptionElement.innerText = gem.description;
             card.appendChild(descriptionElement);
-
-            // Add the whole card to the container
+            
             gemSelectionContainer.appendChild(card);
         });
     }
-    
-    // We will add an "Upgrade" button here later for free users
 }
+
 function selectGem(gem) {
     activeGem = gem;
     gemSelectionContainer.style.display = 'none';
     chatWindow.style.display = 'block';
     appHeader.innerText = activeGem.name;
-    // Clear any previous messages and add the initial prompt
-    chatMessages.innerHTML = ''; 
-    addMessageToChat('Gemini Gem', `You've selected the "${activeGem.name}" coach. How can I help you today?`);
+    chatMessages.innerHTML = ''; // Clear previous chats
+    addMessageToChat('Gemini Gem', `You've selected the "${gem.name}" coach. How can I help you today?`);
 }
 
 async function handleSendMessage() {
@@ -70,11 +66,10 @@ async function handleSendMessage() {
     sendButton.disabled = true;
     micButton.disabled = true;
 
-    // Create a history of the chat to send to the backend
+    // Create chat history for the AI
     const chatHistory = [];
     const messages = chatMessages.querySelectorAll('p');
-    // We skip the first message, which is the initial welcome.
-    for (let i = 1; i < messages.length; i++) {
+    for (let i = 1; i < messages.length; i++) { // Skip the first welcome message
         const msg = messages[i];
         const fullText = msg.textContent || msg.innerText;
         const senderText = msg.querySelector('strong').textContent;
@@ -168,22 +163,5 @@ userInput.addEventListener('keypress', (event) => {
 });
 
 // --- Initial Load ---
-supabase.auth.onAuthStateChange((event, session) => {
-    if (event === 'SIGNED_IN') {
-        loadUserProfile();
-    }
-});
-loadUserProfile(); // Also check on initial page load
-
-async function loadUserProfile() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-        const { data, error } = await supabase.from('profiles').select('subscription_status').eq('id', user.id).single();
-        if (error) {
-            console.error('Error fetching profile:', error);
-        } else {
-            userProfile = data;
-            loadGems();
-        }
-    }
-}
+// This simple call will load the gems for any logged-in user.
+loadGems();
