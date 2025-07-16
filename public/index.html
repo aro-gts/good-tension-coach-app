@@ -8,7 +8,7 @@
 </head>
 <body>
 
-    <div id="login-screen">
+    <div id="login-screen" style="display: none;">
         <header>
             <h1>Good Tension AI Coach</h1>
             <p>Your Personalized Executive Coaching Partner</p>
@@ -26,9 +26,9 @@
         </main>
     </div>
 
-    <div id="app-screen" style="display: none;">
+    <div id="app-screen" style="display: block;">
         <header class="app-header">
-            <h2>Your AI Coach</h2>
+            <h2>Your AI Executive Coach</h2>
             <button id="logout-button">Logout</button>
         </header>
 
@@ -36,10 +36,8 @@
             <div id="gem-selection">
                 <h3>Select a Coach</h3>
             </div>
-            
             <div id="chat-window" style="display: none;">
-                <div id="chat-messages">
-                    </div>
+                <div id="chat-messages"></div>
                 <div id="chat-input-area">
                     <input type="text" id="user-input" placeholder="Type or click the mic to speak...">
                     <button id="mic-button" style="display: none;">🎤</button>
