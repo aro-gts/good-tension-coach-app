@@ -3,6 +3,7 @@ import { supabase } from './client.js';
 
 // --- Global Variables ---
 let activeGem = null;
+let userProfile = null;
 
 // --- Get HTML Elements ---
 const gemSelectionContainer = document.getElementById('gem-selection');
@@ -14,10 +15,25 @@ const micButton = document.getElementById('mic-button');
 const appHeader = document.querySelector('.app-header h2');
 
 // --- Main Functions ---
-async function loadGems() {
-    // This query fetches ALL gems from the database.
-    const { data, error } = await supabase.from('gems').select('*');
+async function loadUserProfile() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+        const { data, error } = await supabase.from('profiles').select('subscription_status').eq('id', user.id).single();
+        if (error && error.code !== 'PGRST116') {
+            console.error('Error fetching profile:', error);
+        } else {
+            userProfile = data;
+        }
+    }
+    loadGems();
+}
 
+async function loadGems() {
+    let query = supabase.from('gems').select('*');
+    if (!userProfile || userProfile.subscription_status === 'free') {
+         query = query.eq('name', 'Mind Over Muddle: Uncomplicating Your Leadership Brain');
+    }
+    const { data, error } = await query;
     if (error) {
         console.error('Error fetching gems:', error);
         gemSelectionContainer.innerHTML = `<p style="color: red;">Error loading coaches: ${error.message}</p>`;
@@ -33,15 +49,12 @@ function displayGems(gems) {
             const card = document.createElement('div');
             card.classList.add('gem-card');
             card.addEventListener('click', () => selectGem(gem));
-
             const nameElement = document.createElement('h4');
             nameElement.innerText = gem.name;
             card.appendChild(nameElement);
-
             const descriptionElement = document.createElement('p');
             descriptionElement.innerText = gem.description;
             card.appendChild(descriptionElement);
-
             gemSelectionContainer.appendChild(card);
         });
     }
@@ -52,7 +65,7 @@ function selectGem(gem) {
     gemSelectionContainer.style.display = 'none';
     chatWindow.style.display = 'block';
     appHeader.innerText = activeGem.name;
-    chatMessages.innerHTML = ''; // Clear previous chats
+    chatMessages.innerHTML = '';
     addMessageToChat('Your AI Executive Coach', `You've selected the "${gem.name}" coach. How can I help you today?`);
 }
 
@@ -68,10 +81,12 @@ async function handleSendMessage() {
 
     const chatHistory = [];
     const messages = chatMessages.querySelectorAll('p');
+    // We skip the first message, which is the initial welcome.
     for (let i = 1; i < messages.length; i++) {
         const msg = messages[i];
         const fullText = msg.textContent || msg.innerText;
         const senderText = msg.querySelector('strong').textContent;
+        // THE FIX IS HERE: The AI's role must be 'assistant'
         const role = (senderText === 'You:') ? 'user' : 'assistant';
         const content = fullText.substring(senderText.length).trim();
         chatHistory.push({ role: role, content: content });
@@ -142,13 +157,4 @@ if (SpeechRecognition) {
         micButton.disabled = false;
     };
 } else {
-    console.log('Speech Recognition Not Supported');
-    micButton.style.display = 'none';
-}
-
-sendButton.addEventListener('click', handleSendMessage);
-userInput.addEventListener('keypress', (event) => {
-    if (event.key === 'Enter') handleSendMessage();
-});
-
-loadGems();
+    console.log
