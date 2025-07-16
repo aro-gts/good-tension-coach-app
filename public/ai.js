@@ -1,7 +1,5 @@
 import { supabase } from './client.js';
-
 let activeGem = null;
-
 const gemSelectionContainer = document.getElementById('gem-selection');
 const chatWindow = document.getElementById('chat-window');
 const chatMessages = document.getElementById('chat-messages');
@@ -35,8 +33,6 @@ function displayGems(gems) {
             card.appendChild(descriptionElement);
             gemSelectionContainer.appendChild(card);
         });
-    } else {
-        gemSelectionContainer.innerHTML += '<p>No coaches found.</p>';
     }
 }
 
@@ -44,12 +40,100 @@ function selectGem(gem) {
     activeGem = gem;
     gemSelectionContainer.style.display = 'none';
     chatWindow.style.display = 'block';
-    appHeader.innerText = activeGem.name;
+    appHeader.innerText = gem.name;
     chatMessages.innerHTML = '';
     addMessageToChat('Your AI Executive Coach', `You've selected the "${gem.name}" coach. How can I help you today?`);
 }
 
-// The rest of the functions (handleSendMessage, addMessageToChat, Speech Recognition) remain the same...
-// They will be added back in the final version.
+async function handleSendMessage() {
+    const messageText = userInput.value.trim();
+    if (messageText === '' || !activeGem) return;
+    addMessageToChat('You', messageText);
+    userInput.value = '';
+    userInput.disabled = true;
+    sendButton.disabled = true;
+    micButton.disabled = true;
+    const chatHistory = [];
+    const messages = chatMessages.querySelectorAll('p');
+    for (let i = 1; i < messages.length; i++) {
+        const msg = messages[i];
+        const fullText = msg.textContent || msg.innerText;
+        const senderText = msg.querySelector('strong').textContent;
+        const role = (senderText === 'You:') ? 'user' : 'assistant';
+        const content = fullText.substring(senderText.length).trim();
+        chatHistory.push({ role: role, content: content });
+    }
+    try {
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: activeGem.prompt, history: chatHistory }),
+        });
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Network response was not ok.');
+        }
+        const data = await response.json();
+        addMessageToChat('Your AI Executive Coach', data.reply);
+    } catch (error) {
+        console.error('Error sending message:', error);
+        addMessageToChat('System', `Sorry, an error occurred: ${error.message}`);
+    } finally {
+        userInput.disabled = false;
+        sendButton.disabled = false;
+        micButton.disabled = false;
+        userInput.focus();
+    }
+}
 
-loadGems(); // Run the load function immediately.
+function addMessageToChat(sender, text) {
+    const messageElement = document.createElement('p');
+    const strong = document.createElement('strong');
+    strong.textContent = `${sender}: `;
+    messageElement.appendChild(strong);
+    let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+    const textSpan = document.createElement('span');
+    textSpan.innerHTML = formattedText;
+    messageElement.appendChild(textSpan);
+    chatMessages.appendChild(messageElement);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (SpeechRecognition) {
+    micButton.style.display = 'inline-block';
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    micButton.addEventListener('click', () => {
+        recognition.start();
+        micButton.textContent = '...';
+        micButton.disabled = true;
+    });
+    recognition.onresult = (event) => {
+        const speechResult = event.results[0][0].transcript;
+        userInput.value = speechResult;
+        handleSendMessage();
+    };
+    recognition.onspeechend = () => {
+        recognition.stop();
+        micButton.textContent = '🎤';
+        micButton.disabled = false;
+    };
+    recognition.onerror = (event) => {
+        alert('Speech recognition error detected: ' + event.error);
+        micButton.textContent = '🎤';
+        micButton.disabled = false;
+    };
+} else {
+    console.log('Speech Recognition Not Supported');
+}
+
+sendButton.addEventListener('click', handleSendMessage);
+userInput.addEventListener('keypress', (event) => {
+    if (event.key === 'Enter') handleSendMessage();
+});
+
+loadGems();
