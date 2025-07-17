@@ -21,22 +21,31 @@ app.use(express.json());
 app.post('/api/chat', async (req, res) => {
     try {
         const { prompt, history } = req.body;
+        let messages;
 
         if (!prompt || !history) {
             return res.status(400).json({ error: 'Prompt and history are required.' });
         }
 
-        // Construct the messages array with priming messages
-        const messages = [
-            { role: "system", content: prompt },
-            { role: "user", content: "Let's begin." },
-            { role: "assistant", content: "Understood. I am ready to begin the coaching session. I will now ask my first question." },
-            ...history
-        ];
+        // Check if this is the first message from the user
+        if (history.length === 1 && history[0].role === 'user') {
+            const userFirstMessage = history[0].content;
+            // Create a special prompt for the first turn
+            const initialPrompt = `${prompt}\n\nThe user has just started the session. Their opening message is: "${userFirstMessage}". You must now begin the coaching process by asking your scripted first question as instructed in your rules.`;
+            messages = [
+                { role: "system", content: initialPrompt }
+            ];
+        } else {
+            // For all subsequent turns, use the normal structure
+            messages = [
+                { role: "system", content: prompt },
+                ...history
+            ];
+        }
 
         // Send the request to OpenAI's Chat Completions API
         const completion = await openai.chat.completions.create({
-            model: "gpt-4o",
+            model: "gpt-4o", // Using OpenAI's most capable model for best instruction following
             messages: messages,
         });
 
