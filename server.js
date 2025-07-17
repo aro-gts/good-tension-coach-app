@@ -23,23 +23,25 @@ app.post('/api/chat', async (req, res) => {
         const { prompt, history } = req.body;
 
         if (!prompt || !history) {
-            return res.status(400).json({ error: 'Prompt and message are required.' });
+            return res.status(400).json({ error: 'Prompt and history are required.' });
         }
 
+        // Construct the messages array with priming messages
         const messages = [
             { role: "system", content: prompt },
+            { role: "user", content: "Let's begin." },
+            { role: "assistant", content: "Understood. I am ready to begin the coaching session. I will now ask my first question." },
             ...history
         ];
 
         // Send the request to OpenAI's Chat Completions API
         const completion = await openai.chat.completions.create({
-            // THE FIX IS HERE: Using a more advanced model
-            model: "gpt-4o-mini", 
+            model: "gpt-4o-mini",
             messages: messages,
         });
 
         const reply = completion.choices[0].message.content;
-
+        
         res.json({ reply: reply });
 
     } catch (error) {
