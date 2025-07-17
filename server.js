@@ -36,7 +36,7 @@ app.post('/api/chat', async (req, res) => {
 
         // Send the request to OpenAI's Chat Completions API
         const completion = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
+            model: "gpt-4o",
             messages: messages,
         });
 
