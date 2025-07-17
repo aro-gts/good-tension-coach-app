@@ -1,5 +1,11 @@
+// Import our shared Supabase client connection
 import { supabase } from './client.js';
+
+// --- Global Variables ---
 let activeGem = null;
+let userProfile = null;
+
+// --- Get HTML Elements ---
 const gemSelectionContainer = document.getElementById('gem-selection');
 const chatWindow = document.getElementById('chat-window');
 const chatMessages = document.getElementById('chat-messages');
@@ -8,11 +14,31 @@ const sendButton = document.getElementById('send-button');
 const micButton = document.getElementById('mic-button');
 const appHeader = document.querySelector('.app-header h2');
 
+// --- Main Functions ---
+async function loadUserProfile() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+        const { data, error } = await supabase.from('profiles').select('subscription_status').eq('id', user.id).single();
+        if (error && error.code !== 'PGRST116') {
+            console.error('Error fetching profile:', error);
+        } else {
+            userProfile = data;
+        }
+    }
+    loadGems();
+}
+
 async function loadGems() {
-    const { data, error } = await supabase.from('gems').select('*');
+    let query = supabase.from('gems').select('*');
+
+    if (!userProfile || userProfile.subscription_status === 'free') {
+         query = query.eq('name', 'Mind Over Muddle: Uncomplicating Your Leadership Brain');
+    }
+
+    const { data, error } = await query;
     if (error) {
         console.error('Error fetching gems:', error);
-        gemSelectionContainer.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+        gemSelectionContainer.innerHTML = `<p style="color: red;">Error loading coaches: ${error.message}</p>`;
     } else {
         displayGems(data);
     }
@@ -25,12 +51,15 @@ function displayGems(gems) {
             const card = document.createElement('div');
             card.classList.add('gem-card');
             card.addEventListener('click', () => selectGem(gem));
+            
             const nameElement = document.createElement('h4');
             nameElement.innerText = gem.name;
             card.appendChild(nameElement);
+            
             const descriptionElement = document.createElement('p');
             descriptionElement.innerText = gem.description;
             card.appendChild(descriptionElement);
+            
             gemSelectionContainer.appendChild(card);
         });
     }
@@ -40,7 +69,7 @@ function selectGem(gem) {
     activeGem = gem;
     gemSelectionContainer.style.display = 'none';
     chatWindow.style.display = 'block';
-    appHeader.innerText = gem.name;
+    appHeader.innerText = activeGem.name;
     chatMessages.innerHTML = '';
     addMessageToChat('Your AI Executive Coach', `You've selected the "${gem.name}" coach. How can I help you today?`);
 }
@@ -48,11 +77,13 @@ function selectGem(gem) {
 async function handleSendMessage() {
     const messageText = userInput.value.trim();
     if (messageText === '' || !activeGem) return;
+
     addMessageToChat('You', messageText);
     userInput.value = '';
     userInput.disabled = true;
     sendButton.disabled = true;
     micButton.disabled = true;
+
     const chatHistory = [];
     const messages = chatMessages.querySelectorAll('p');
     for (let i = 1; i < messages.length; i++) {
@@ -63,6 +94,7 @@ async function handleSendMessage() {
         const content = fullText.substring(senderText.length).trim();
         chatHistory.push({ role: role, content: content });
     }
+
     try {
         const response = await fetch('/api/chat', {
             method: 'POST',
@@ -86,19 +118,30 @@ async function handleSendMessage() {
     }
 }
 
+// --- Helper Functions ---
 function addMessageToChat(sender, text) {
     const messageElement = document.createElement('p');
     const strong = document.createElement('strong');
     strong.textContent = `${sender}: `;
     messageElement.appendChild(strong);
-    let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+    
+    let messageContent = text;
+    // THE FIX IS HERE: Check for and remove a leading colon from the AI's response
+    if (sender === 'Your AI Executive Coach' && messageContent.trim().startsWith(':')) {
+        messageContent = messageContent.trim().substring(1).trim();
+    }
+    
+    let formattedText = messageContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
     const textSpan = document.createElement('span');
     textSpan.innerHTML = formattedText;
     messageElement.appendChild(textSpan);
+    
     chatMessages.appendChild(messageElement);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
+
+// --- Speech Recognition Logic ---
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 if (SpeechRecognition) {
     micButton.style.display = 'inline-block';
@@ -131,9 +174,16 @@ if (SpeechRecognition) {
     console.log('Speech Recognition Not Supported');
 }
 
+// --- Event Listeners ---
 sendButton.addEventListener('click', handleSendMessage);
 userInput.addEventListener('keypress', (event) => {
     if (event.key === 'Enter') handleSendMessage();
 });
 
-loadGems();
+// --- Initial Load ---
+supabase.auth.onAuthStateChange((event, session) => {
+    if (session) {
+        loadUserProfile();
+    }
+});
+loadUserProfile();
