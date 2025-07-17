@@ -39,7 +39,7 @@ app.post('/api/chat', async (req, res) => {
         });
 
         const reply = completion.choices[0].message.content;
-        
+
         res.json({ reply: reply });
 
     } catch (error) {
