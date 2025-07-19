@@ -61,7 +61,7 @@ app.post('/api/chat', async (req, res) => {
 
     // ✅ Log conversation to Supabase
     await logConversationToSupabase({
-      sessionId: 'anonymous',
+      sessionId: 'anonymous', // Replace with dynamic ID later if needed
       userMessage: prompt,
       aiResponse: reply,
       tags: history.length === 1 ? 'first-turn' : 'follow-up',
@@ -93,4 +93,6 @@ async function logConversationToSupabase({ sessionId, userMessage, aiResponse, t
 }
 
 // ==== Start the server ====
-app.l
+app.listen(PORT, () => {
+  console.log(`🚀 Server is running on http://localhost:${PORT}`);
+});
