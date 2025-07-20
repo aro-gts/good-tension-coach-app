@@ -53,17 +53,24 @@ app.post('/api/chat', async (req, res) => {
       return res.status(400).json({ error: 'Prompt and history are required.' });
     }
 
-    // Check if this is the first message
     let messages = [];
+    let tag = 'follow-up';
+    let userMessage = '';
+
     if (history.length === 1 && history[0].role === 'user') {
-      const userFirstMessage = history[0].content;
-      const initialPrompt = `System: Your new user has just started the session. Their opening message is: "${userFirstMessage}". You must now begin the coaching process by asking your scripted first question as instructed in your rules.`;
+      userMessage = history[0].content;
+      tag = 'first-turn';
+      const initialPrompt = `System: Your new user has just started the session. Their opening message is: "${userMessage}". You must now begin the coaching process by asking your scripted first question as instructed in your rules.`;
       messages = [
         { role: 'system', content: initialPrompt },
         ...history,
       ];
     } else {
-      // Follow-up messages
+      // Extract the latest user message from the history
+      const userMessages = history.filter(msg => msg.role === 'user');
+      userMessage = userMessages[userMessages.length - 1]?.content || '';
+      tag = getTagFromMessage(userMessage);
+
       messages = [
         { role: 'system', content: prompt },
         ...history,
@@ -78,13 +85,10 @@ app.post('/api/chat', async (req, res) => {
 
     const reply = completion.choices[0].message.content;
 
-    // ✅ Generate tag from input message
-    const tag = getTagFromMessage(prompt);
-
     // ✅ Log conversation to Supabase
     await logConversationToSupabase({
-      sessionId: 'anonymous', // Replace with dynamic ID later if needed
-      userMessage: prompt,
+      sessionId: 'anonymous',
+      userMessage,
       aiResponse: reply,
       tags: tag,
     });
