@@ -8,43 +8,37 @@ const systemPrompt = "This neuro-informed AI Executive Coach helps users explore
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const userMessage = input.value.trim();
-  if (!userMessage) return;
+  const userInput = input.value.trim();
+  if (!userInput) return;
 
-  addMessageToChat('user', userMessage);
+  addMessageToChat('user', userInput);
   input.value = '';
 
   try {
-    const { aiReply, newHistory } = await sendMessageToAI(userMessage, history);
-    history = newHistory;
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: systemPrompt,
+        history: [...history, { role: 'user', content: userInput }],
+        user_input: userInput
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) throw new Error(data.error || 'AI call failed');
+
+    const aiReply = data.reply;
+    history.push({ role: 'user', content: userInput });
+    history.push({ role: 'assistant', content: aiReply });
+
     addMessageToChat('assistant', aiReply);
   } catch (err) {
     console.error('❌ Error from AI:', err);
     addMessageToChat('error', 'Sorry, something went wrong.');
   }
 });
-
-async function sendMessageToAI(userInput, history) {
-  const payload = {
-    prompt: systemPrompt,
-    history: [...history, { role: 'user', content: userInput }],
-    userMessage: userInput, // 🟢 This is KEY for tagging
-  };
-
-  const response = await fetch('/api/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'AI call failed');
-
-  return {
-    aiReply: data.reply,
-    newHistory: [...payload.history, { role: 'assistant', content: data.reply }],
-  };
-}
 
 function addMessageToChat(role, content) {
   const bubble = document.createElement('div');
