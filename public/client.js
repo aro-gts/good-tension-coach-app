@@ -1,6 +1,6 @@
 const form = document.querySelector('form');
 const input = document.querySelector('input');
-const chatContainer = document.getElementById('chat-messages');
+const chatContainer = document.getElementById('chat');
 let history = [];
 
 // SYSTEM DESCRIPTION SENT ON EVERY MESSAGE
@@ -25,18 +25,15 @@ form.addEventListener('submit', async (e) => {
 });
 
 async function sendMessageToAI(userInput, history) {
-  const isFirstMessage = history.length === 0;
-
-  const newHistory = [...history, { role: 'user', content: userInput }];
   const payload = {
     prompt: systemPrompt,
-    history: newHistory,
+    history: [...history, { role: 'user', content: userInput }],
   };
 
   const response = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...payload, user_message: userInput }), // ✅ Pass real input
   });
 
   const data = await response.json();
@@ -45,7 +42,7 @@ async function sendMessageToAI(userInput, history) {
 
   return {
     aiReply: data.reply,
-    newHistory: [...newHistory, { role: 'assistant', content: data.reply }],
+    newHistory: [...payload.history, { role: 'assistant', content: data.reply }],
   };
 }
 
