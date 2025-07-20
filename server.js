@@ -3,31 +3,43 @@ import path from 'path';
 import { config } from 'dotenv';
 import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
+import { fileURLToPath } from 'url';
 
 config();
-const PORT = process.env.PORT || 3000;
-const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+const PORT = process.env.PORT || 3000;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
 
 const app = express();
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-app.post('/api/chat', async (req, res) => {
+// ✅ CHAT ENDPOINT
+app.post('/api/chat1', async (req, res) => {
   try {
     const { prompt, history, user_input } = req.body;
 
     if (!prompt || !history || !user_input) {
-      return res.status(400).json({ error: 'Prompt, history, and user input are required.' });
+      return res
+        .status(400)
+        .json({ error: 'Prompt, history, and user input are required.' });
     }
 
     let tag = '';
-    let userMessage = user_input?.trim() || 'UNKNOWN';
+    const userMessage = user_input.trim();
     let messages = [];
 
     if (history.length === 1 && history[0].role === 'user') {
+      // 🎯 First message from user: system instructs coaching entry
       tag = 'first-turn';
       messages = [
         {
@@ -37,14 +49,12 @@ app.post('/api/chat', async (req, res) => {
         ...history,
       ];
     } else {
+      // 📌 Normal continuation
       tag = 'follow-up';
-      messages = [
-        { role: 'system', content: prompt },
-        ...history,
-      ];
+      messages = [{ role: 'system', content: prompt }, ...history];
     }
 
-    // 🧠 GPT-powered smart tagging
+    // 🔍 SMART TAGGING
     const tagResponse = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
@@ -58,6 +68,7 @@ app.post('/api/chat', async (req, res) => {
 
     const smartTags = tagResponse.choices[0].message.content.trim();
 
+    // 🧠 GET AI REPLY
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: messages,
@@ -65,7 +76,7 @@ app.post('/api/chat', async (req, res) => {
 
     const reply = completion.choices[0].message.content;
 
-    // ✅ Log to Supabase
+    // ✅ LOG TO SUPABASE
     await logConversationToSupabase({
       sessionId: 'anonymous',
       userMessage,
@@ -73,13 +84,14 @@ app.post('/api/chat', async (req, res) => {
       tags: `${tag} | ${smartTags}`,
     });
 
-    res.json({ reply });
+    res.json({ assistant: reply });
   } catch (error) {
-    console.error('⚠️ Error:', error);
-    res.status(500).json({ error: 'Failed to get response from AI.' });
+    console.error('⚠️ Server error:', error);
+    res.status(500).json({ error: 'AI response failed.' });
   }
 });
 
+// ✅ LOGGING FUNCTION
 async function logConversationToSupabase({ sessionId, userMessage, aiResponse, tags }) {
   try {
     const { error } = await supabase.from('QA').insert([
@@ -97,6 +109,7 @@ async function logConversationToSupabase({ sessionId, userMessage, aiResponse, t
   }
 }
 
+// ✅ START SERVER
 app.listen(PORT, () => {
-  console.log(`🚀 Server is running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running: http://localhost:${PORT}`);
 });
