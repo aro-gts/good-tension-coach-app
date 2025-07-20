@@ -1,6 +1,6 @@
 import { supabase } from './client.js';
 
-// DOM Elements
+// DOM elements
 const gemSelection = document.getElementById('gem-selection');
 const chatWindow = document.getElementById('chat-window');
 const chatForm = document.getElementById('chat-form');
@@ -9,94 +9,84 @@ const userInput = document.getElementById('user-input');
 
 let selectedCoach = null;
 
-// List of available coaches
+// Coach setup — only free one shown
 const coaches = [
   {
     id: 'muddle',
     name: 'Mind Over Muddle',
-    description: 'Uncomplicating Your Leadership Brain'
-  },
-  {
-    id: 'deepdive',
-    name: 'Deep Dive Decisions',
-    description: 'Get clarity on complex choices'
+    description: 'Uncomplicating Your Leadership Brain',
+    greeting: `This neuro-informed AI Executive Coach helps you gain clarity and traction by untangling overwhelm, surfacing goals, and reconnecting to purpose. What's on your mind?`
   }
 ];
 
-// Smart tag detection (basic keyword match)
-function getTagsFromMessage(text) {
-  const tags = [];
-  const lowered = text.toLowerCase();
-  if (lowered.includes('overwhelm')) tags.push('overwhelm');
-  if (lowered.includes('conflict')) tags.push('conflict');
-  if (lowered.includes('goal') || lowered.includes('objectives')) tags.push('goals');
-  if (lowered.includes('stuck') || lowered.includes('unclear')) tags.push('clarity');
-  if (tags.length === 0) tags.push('follow-up'); // fallback
-  return tags;
-}
-
-// Render coach buttons
-function renderCoachButtons() {
-  gemSelection.innerHTML = '<h3>Select a Coach</h3>';
-  coaches.forEach(coach => {
-    const button = document.createElement('button');
-    button.textContent = `${coach.name} – ${coach.description}`;
-    button.classList.add('coach-button');
-    button.addEventListener('click', () => selectCoach(coach));
-    gemSelection.appendChild(button);
+// Render coach buttons (only freemium coach)
+coaches.forEach(coach => {
+  const button = document.createElement('button');
+  button.textContent = `${coach.name} – ${coach.description}`;
+  button.classList.add('coach-button');
+  button.addEventListener('click', () => {
+    selectedCoach = coach;
+    gemSelection.style.display = 'none';
+    chatWindow.style.display = 'block';
+    addMessage('assistant', coach.greeting);
   });
-}
+  gemSelection.appendChild(button);
+});
 
-// Handle coach selection
-function selectCoach(coach) {
-  selectedCoach = coach;
-  gemSelection.style.display = 'none';
-  chatWindow.style.display = 'block';
-  addMessage('ai', `This neuro-informed AI Executive Coach, *${coach.name}*, is thinking on where to begin to help…`);
-}
+// Send chat message
+chatForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const text = userInput.value.trim();
+  if (!text) return;
 
-// Render chat message
+  addMessage('user', text);
+  userInput.value = '';
+
+  const tags = getTagsFromMessage(text);
+
+  const response = await fetch('/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      prompt: text,
+      coach: selectedCoach?.id || 'unknown'
+    })
+  });
+
+  const data = await response.json();
+  const aiText = data.message || "Hmm, I'm still thinking...";
+  addMessage('assistant', aiText);
+
+  await supabase.from('QA').insert([
+    {
+      user_message: text,
+      ai_response: aiText,
+      tags: tags.join(', '),
+    }
+  ]);
+});
+
+// Add message to thread
 function addMessage(sender, text) {
-  const message = document.createElement('div');
-  message.className = `message ${sender}`;
-  message.textContent = text;
-  chatThread.appendChild(message);
+  const messageEl = document.createElement('div');
+  messageEl.classList.add('message', sender);
+  messageEl.textContent = text;
+  chatThread.appendChild(messageEl);
   chatThread.scrollTop = chatThread.scrollHeight;
 }
 
-// Handle chat submission
-chatForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const input = userInput.value.trim();
-  if (!input) return;
+// Smart tag detection (basic keyword match)
+function getTagsFromMessage(text) {
+  const lowered = text.toLowerCase();
+  const tags = [];
 
-  // Add user message
-  addMessage('user', input);
-  userInput.value = '';
+  if (lowered.includes('overwhelm')) tags.push('overwhelm');
+  if (lowered.includes('conflict')) tags.push('conflict');
+  if (lowered.includes('goal') || lowered.includes('objectives')) tags.push('goals');
+  if (lowered.includes('stuck')) tags.push('stuck');
+  if (lowered.includes('reset')) tags.push('reset');
+  if (lowered.includes('decision')) tags.push('decisions');
+  if (lowered.includes('team')) tags.push('team');
 
-  // Tag detection
-  const tags = getTagsFromMessage(input);
-  console.log('🔖 Tags:', tags);
-
-  // Generate simple AI reply
-  const aiResponse = `Thanks for sharing. Let's explore how we can address that. (Coach: ${selectedCoach?.name})`;
-  addMessage('ai', aiResponse);
-
-  // Log to Supabase
-  const { error } = await supabase.from('qa').insert([
-    {
-      user_message: input,
-      ai_response: aiResponse,
-      tags: tags.join(', ')
-    }
-  ]);
-
-  if (error) {
-    console.error('❌ Error logging to Supabase:', error.message);
-  } else {
-    console.log('✅ Logged message to Supabase');
-  }
-});
-
-// Init
-renderCoachButtons();
+  return tags;
+}
