@@ -14,7 +14,7 @@ async function loadGemPrompt() {
   const { data, error } = await supabase
     .from('gems')
     .select('*')
-    .eq('id', 1)
+    .eq('id', 1) // Only load "Mind Over Muddle"
     .single();
 
   if (error) {
@@ -23,11 +23,11 @@ async function loadGemPrompt() {
   }
 
   selectedGem = data;
+
   const intro = document.createElement('div');
   intro.className = 'ai-message';
-  intro.innerText = `${data.description} ${data.prompt}
+  intro.innerText = `${data.description}\n\n${data.prompt}\n\nWhat's on your mind?`;
 
-What's on your mind?`;
   chatThread.appendChild(intro);
   chatWindow.style.display = 'block';
 }
@@ -60,6 +60,7 @@ chatForm.addEventListener('submit', async (e) => {
   const message = userInput.value.trim();
   if (!message) return;
 
+  // Display user message
   const userDiv = document.createElement('div');
   userDiv.className = 'user-message';
   userDiv.innerText = message;
@@ -70,9 +71,12 @@ chatForm.addEventListener('submit', async (e) => {
 
   try {
     const aiReply = await sendMessageToAI(message);
+
+    // Track message history
     messageHistory.push({ role: 'user', content: message });
     messageHistory.push({ role: 'assistant', content: aiReply });
 
+    // Display AI reply
     const aiDiv = document.createElement('div');
     aiDiv.className = 'ai-message';
     aiDiv.innerText = aiReply;
@@ -80,7 +84,7 @@ chatForm.addEventListener('submit', async (e) => {
   } catch (err) {
     const errorDiv = document.createElement('div');
     errorDiv.className = 'ai-message';
-    errorDiv.innerText = 'Something went wrong.';
+    errorDiv.innerText = 'Something went wrong. Please try again.';
     chatThread.appendChild(errorDiv);
     console.error(err);
   }
@@ -88,4 +92,5 @@ chatForm.addEventListener('submit', async (e) => {
   userInput.disabled = false;
 });
 
+// Initialize chat
 loadGemPrompt();
