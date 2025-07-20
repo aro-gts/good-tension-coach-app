@@ -1,5 +1,5 @@
-const form = document.querySelector('form');
-const input = document.querySelector('input');
+const form = document.getElementById('chat-form');
+const input = document.getElementById('user-input');
 const chatContainer = document.getElementById('chat');
 let history = [];
 
@@ -28,16 +28,16 @@ async function sendMessageToAI(userInput, history) {
   const payload = {
     prompt: systemPrompt,
     history: [...history, { role: 'user', content: userInput }],
+    userMessage: userInput, // 🟢 This is KEY for tagging
   };
 
   const response = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...payload, user_message: userInput }), // ✅ Pass real input
+    body: JSON.stringify(payload),
   });
 
   const data = await response.json();
-
   if (!response.ok) throw new Error(data.error || 'AI call failed');
 
   return {
