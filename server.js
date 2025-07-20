@@ -1,18 +1,19 @@
 import express from "express";
-import dotenv from "dotenv";
 import cors from "cors";
+import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
-import { OpenAI } from "openai";
-import bodyParser from "body-parser";
+import OpenAI from "openai";
 
+// ✅ Load environment variables
 dotenv.config();
+
 const app = express();
 app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json());
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY // 🔥 this now matches your Render env var
+  process.env.SUPABASE_ANON_KEY
 );
 
 const openai = new OpenAI({
