@@ -27,53 +27,37 @@ app.use(express.json());
 // ==== API Route ====
 app.post('/api/chat', async (req, res) => {
   try {
-    const { prompt, history } = req.body;
+    const { prompt, history, user_message } = req.body;
 
     if (!prompt || !history) {
       return res.status(400).json({ error: 'Prompt and history are required.' });
     }
 
+    let userMessage = user_message || 'UNKNOWN';
     let messages = [];
-    let userMessage = '';
     let tag = '';
 
-    // ==== First Message Case ====
     if (history.length === 1 && history[0].role === 'user') {
-      const userFirstMessage = history[0].content;
-      userMessage = userFirstMessage;
+      // First user message
       tag = 'first-turn';
-
-      const initialPrompt = `System: Your new user has just started the session. Their opening message is: "${userFirstMessage}". You must now begin the coaching process by asking your scripted first question as instructed in your rules.`;
+      const initialPrompt = `System: Your new user has just started the session. Their opening message is: "${userMessage}". You must now begin the coaching process by asking your scripted first question as instructed in your rules.`;
 
       messages = [
         { role: 'system', content: initialPrompt },
         ...history,
       ];
     } else {
-      // ==== Follow-up Case ====
-      const historyCopy = [...history];
-      const userMessages = historyCopy.filter(m => m.role === 'user');
-
-      if (userMessages.length > 0) {
-        userMessage = userMessages[userMessages.length - 1].content;
-      } else {
-        console.warn('⚠️ No user messages found in history!');
-        userMessage = 'UNKNOWN';
-      }
-
+      // Follow-up messages
       tag = 'follow-up';
-
       messages = [
         { role: 'system', content: prompt },
-        ...historyCopy,
+        ...history,
       ];
     }
 
-    // ==== Debug Logs ====
     console.log('🟢 USER MESSAGE FOR TAGGING:', userMessage);
     console.log('🏷️ TAG SELECTED:', tag);
 
-    // ==== Call OpenAI ====
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: messages,
@@ -81,7 +65,6 @@ app.post('/api/chat', async (req, res) => {
 
     const reply = completion.choices[0].message.content;
 
-    // ==== Log to Supabase ====
     await logConversationToSupabase({
       sessionId: 'anonymous',
       userMessage,
@@ -114,7 +97,7 @@ async function logConversationToSupabase({ sessionId, userMessage, aiResponse, t
   }
 }
 
-// ==== Start the Server ====
+// ==== Start the server ====
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
 });
