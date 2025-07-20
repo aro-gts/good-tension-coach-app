@@ -13,7 +13,6 @@ loginButton.addEventListener('click', async () => {
   const password = document.getElementById('password-input').value;
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-
   if (error) {
     alert('Login failed: ' + error.message);
   } else {
@@ -28,7 +27,6 @@ signupButton.addEventListener('click', async () => {
   const password = document.getElementById('password-input').value;
 
   const { error } = await supabase.auth.signUp({ email, password });
-
   if (error) {
     alert('Signup failed: ' + error.message);
   } else {
@@ -38,11 +36,11 @@ signupButton.addEventListener('click', async () => {
 
 logoutButton.addEventListener('click', async () => {
   const { error } = await supabase.auth.signOut();
-
   if (error) {
     alert('Logout failed: ' + error.message);
   } else {
     loginScreen.style.display = 'block';
     appScreen.style.display = 'none';
+    chatWindow.style.display = 'none';
   }
 });
