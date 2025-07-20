@@ -1,92 +1,80 @@
 import { supabase } from './client.js';
 
-// DOM elements
 const gemSelection = document.getElementById('gem-selection');
 const chatWindow = document.getElementById('chat-window');
 const chatForm = document.getElementById('chat-form');
 const chatThread = document.getElementById('chat');
 const userInput = document.getElementById('user-input');
 
-let selectedCoach = null;
+let selectedGem = null;
+let messageHistory = [];
 
-// Coach setup — only free one shown
-const coaches = [
-  {
-    id: 'muddle',
-    name: 'Mind Over Muddle',
-    description: 'Uncomplicating Your Leadership Brain',
-    greeting: `This neuro-informed AI Executive Coach helps you gain clarity and traction by untangling overwhelm, surfacing goals, and reconnecting to purpose. What's on your mind?`
+async function loadGemPrompt() {
+  const { data, error } = await supabase.from('gems').select('*').eq('id', 1).single();
+  if (error) {
+    console.error('Error loading gem:', error.message);
+    return;
   }
-];
 
-// Render coach buttons (only freemium coach)
-coaches.forEach(coach => {
-  const button = document.createElement('button');
-  button.textContent = `${coach.name} – ${coach.description}`;
-  button.classList.add('coach-button');
-  button.addEventListener('click', () => {
-    selectedCoach = coach;
-    gemSelection.style.display = 'none';
-    chatWindow.style.display = 'block';
-    addMessage('assistant', coach.greeting);
-  });
-  gemSelection.appendChild(button);
-});
+  selectedGem = data;
 
-// Send chat message
-chatForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const text = userInput.value.trim();
-  if (!text) return;
+  const intro = document.createElement('div');
+  intro.className = 'ai-message';
+  intro.innerText = `${data.description}\n\n${data.prompt}\n\nWhat's on your mind?`;
+  chatThread.appendChild(intro);
+  chatWindow.style.display = 'block';
+}
 
-  addMessage('user', text);
-  userInput.value = '';
+async function sendMessageToAI(userMessage) {
+  const prompt = selectedGem?.prompt || '';
+  const payload = { prompt, user_input: userMessage, history: messageHistory };
 
-  const tags = getTagsFromMessage(text);
-
-  const response = await fetch('/chat', {
+  const response = await fetch('/api/chat1', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      prompt: text,
-      coach: selectedCoach?.id || 'unknown'
-    })
+    body: JSON.stringify(payload)
   });
 
-  const data = await response.json();
-  const aiText = data.message || "Hmm, I'm still thinking...";
-  addMessage('assistant', aiText);
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error('AI Error: ' + err);
+  }
 
-  await supabase.from('QA').insert([
-    {
-      user_message: text,
-      ai_response: aiText,
-      tags: tags.join(', '),
-    }
-  ]);
+  const { assistant } = await response.json();
+  return assistant;
+}
+
+chatForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const message = userInput.value.trim();
+  if (!message) return;
+
+  const userDiv = document.createElement('div');
+  userDiv.className = 'user-message';
+  userDiv.innerText = message;
+  chatThread.appendChild(userDiv);
+
+  userInput.value = '';
+  userInput.disabled = true;
+
+  try {
+    const aiReply = await sendMessageToAI(message);
+    messageHistory.push({ role: 'user', content: message });
+    messageHistory.push({ role: 'assistant', content: aiReply });
+
+    const aiDiv = document.createElement('div');
+    aiDiv.className = 'ai-message';
+    aiDiv.innerText = aiReply;
+    chatThread.appendChild(aiDiv);
+  } catch (err) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'ai-message';
+    errorDiv.innerText = 'Something went wrong.';
+    chatThread.appendChild(errorDiv);
+    console.error(err);
+  }
+
+  userInput.disabled = false;
 });
 
-// Add message to thread
-function addMessage(sender, text) {
-  const messageEl = document.createElement('div');
-  messageEl.classList.add('message', sender);
-  messageEl.textContent = text;
-  chatThread.appendChild(messageEl);
-  chatThread.scrollTop = chatThread.scrollHeight;
-}
-
-// Smart tag detection (basic keyword match)
-function getTagsFromMessage(text) {
-  const lowered = text.toLowerCase();
-  const tags = [];
-
-  if (lowered.includes('overwhelm')) tags.push('overwhelm');
-  if (lowered.includes('conflict')) tags.push('conflict');
-  if (lowered.includes('goal') || lowered.includes('objectives')) tags.push('goals');
-  if (lowered.includes('stuck')) tags.push('stuck');
-  if (lowered.includes('reset')) tags.push('reset');
-  if (lowered.includes('decision')) tags.push('decisions');
-  if (lowered.includes('team')) tags.push('team');
-
-  return tags;
-}
+loadGemPrompt();
