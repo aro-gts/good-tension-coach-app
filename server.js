@@ -1,4 +1,3 @@
-// Use the modern `import` syntax
 import express from 'express';
 import path from 'path';
 import { config } from 'dotenv';
@@ -35,31 +34,39 @@ app.post('/api/chat', async (req, res) => {
     }
 
     let messages = [];
-    let tag = '';
     let userMessage = '';
+    let tag = '';
 
+    // First message case
     if (history.length === 1 && history[0].role === 'user') {
-      // First message
-      userMessage = history[0].content;
-      const initialPrompt = `System: Your new user has just started the session. Their opening message is: "${userMessage}". You must now begin the coaching process by asking your scripted first question as instructed in your rules.`;
+      const userFirstMessage = history[0].content;
+      userMessage = userFirstMessage;
+      tag = 'first-turn';
+
+      const initialPrompt = `System: Your new user has just started the session. Their opening message is: "${userFirstMessage}". You must now begin the coaching process by asking your scripted first question as instructed in your rules.`;
+
       messages = [
         { role: 'system', content: initialPrompt },
         ...history,
       ];
-      tag = 'first-turn';
     } else {
-      // Follow-up
-      const latestUserMessage = history.reverse().find(m => m.role === 'user');
+      // Follow-up case
+      const historyCopy = [...history];
+      const latestUserMessage = [...historyCopy].reverse().find(m => m.role === 'user');
       userMessage = latestUserMessage?.content || 'EMPTY_FOLLOWUP';
+      tag = 'follow-up';
+
       messages = [
         { role: 'system', content: prompt },
-        ...history.reverse(), // restore order
+        ...historyCopy,
       ];
-      tag = 'follow-up';
     }
 
+    // 🧪 Log what’s going on (debug only, safe to remove later)
     console.log('🟢 USER MESSAGE FOR TAGGING:', userMessage);
+    console.log('🏷️ TAG SELECTED:', tag);
 
+    // Call OpenAI
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: messages,
@@ -67,8 +74,7 @@ app.post('/api/chat', async (req, res) => {
 
     const reply = completion.choices[0].message.content;
 
-    console.log('🏷️ TAG SELECTED:', tag);
-
+    // ✅ Log to Supabase
     await logConversationToSupabase({
       sessionId: 'anonymous',
       userMessage,
