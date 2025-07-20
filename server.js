@@ -67,4 +67,51 @@ app.post('/api/chat', async (req, res) => {
       ];
     }
 
-    console.log('🟡 USER MESSAGE FOR TAGGI
+    console.log('🟡 USER MESSAGE FOR TAGGING:', userMessage);
+    console.log('🟢 TAG SELECTED:', tag);
+
+    // Call OpenAI
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: messages,
+    });
+
+    const reply = completion.choices[0].message.content;
+
+    // ✅ Log conversation to Supabase
+    await logConversationToSupabase({
+      sessionId: 'anonymous', // Replace with real session ID logic later
+      userMessage,
+      aiResponse: reply,
+      tags: tag,
+    });
+
+    res.json({ reply });
+  } catch (error) {
+    console.error('⚠️ Error:', error);
+    res.status(500).json({ error: 'Failed to get response from AI.' });
+  }
+});
+
+// ==== Supabase Logging Function ====
+async function logConversationToSupabase({ sessionId, userMessage, aiResponse, tags = '' }) {
+  try {
+    const { error } = await supabase.from('QA').insert([
+      {
+        session_id: sessionId,
+        user_message: userMessage,
+        ai_response: aiResponse,
+        tags: tags,
+      },
+    ]);
+    if (error) throw error;
+    console.log('✅ Logged to Supabase');
+  } catch (err) {
+    console.error('❌ Supabase log error:', err.message);
+  }
+}
+
+// ==== Start the server ====
+app.listen(PORT, () => {
+  console.log(`🚀 Server is running on http://localhost:${PORT}`);
+});
