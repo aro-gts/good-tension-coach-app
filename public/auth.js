@@ -12,12 +12,11 @@ loginButton.addEventListener('click', async () => {
   const email = document.getElementById('email-input').value;
   const password = document.getElementById('password-input').value;
 
-  const { error, data } = await supabase.auth.signInWithPassword({ email, password });
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
     alert('Login failed: ' + error.message);
   } else {
-    console.log('✅ Logged in user:', data.user.email);
     loginScreen.style.display = 'none';
     appScreen.style.display = 'block';
     chatWindow.style.display = 'block';
@@ -38,4 +37,12 @@ signupButton.addEventListener('click', async () => {
 });
 
 logoutButton.addEventListener('click', async () => {
-  const { error } = await supab
+  const { error } = await supabase.auth.signOut();
+
+  if (error) {
+    alert('Logout failed: ' + error.message);
+  } else {
+    loginScreen.style.display = 'block';
+    appScreen.style.display = 'none';
+  }
+});
