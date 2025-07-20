@@ -1,63 +1,102 @@
 import { supabase } from './client.js';
 
-const form = document.querySelector('#chat-form');
-const input = document.querySelector('#user-input');
-const chatContainer = document.getElementById('chat');
-let history = [];
+// DOM Elements
+const gemSelection = document.getElementById('gem-selection');
+const chatWindow = document.getElementById('chat-window');
+const chatForm = document.getElementById('chat-form');
+const chatThread = document.getElementById('chat');
+const userInput = document.getElementById('user-input');
 
-const systemPrompt = `
-You are a neuro-informed AI Executive Coach. You help users explore tensions, clarify goals, and reflect — always through a coaching mindset.
-Ask one powerful question at a time. Do not give advice. Never list multiple questions.
-`;
+let selectedCoach = null;
 
-form.addEventListener('submit', async (e) => {
+// List of available coaches
+const coaches = [
+  {
+    id: 'muddle',
+    name: 'Mind Over Muddle',
+    description: 'Uncomplicating Your Leadership Brain'
+  },
+  {
+    id: 'deepdive',
+    name: 'Deep Dive Decisions',
+    description: 'Get clarity on complex choices'
+  }
+];
+
+// Smart tag detection (basic keyword match)
+function getTagsFromMessage(text) {
+  const tags = [];
+  const lowered = text.toLowerCase();
+  if (lowered.includes('overwhelm')) tags.push('overwhelm');
+  if (lowered.includes('conflict')) tags.push('conflict');
+  if (lowered.includes('goal') || lowered.includes('objectives')) tags.push('goals');
+  if (lowered.includes('stuck') || lowered.includes('unclear')) tags.push('clarity');
+  if (tags.length === 0) tags.push('follow-up'); // fallback
+  return tags;
+}
+
+// Render coach buttons
+function renderCoachButtons() {
+  gemSelection.innerHTML = '<h3>Select a Coach</h3>';
+  coaches.forEach(coach => {
+    const button = document.createElement('button');
+    button.textContent = `${coach.name} – ${coach.description}`;
+    button.classList.add('coach-button');
+    button.addEventListener('click', () => selectCoach(coach));
+    gemSelection.appendChild(button);
+  });
+}
+
+// Handle coach selection
+function selectCoach(coach) {
+  selectedCoach = coach;
+  gemSelection.style.display = 'none';
+  chatWindow.style.display = 'block';
+  addMessage('ai', `This neuro-informed AI Executive Coach, *${coach.name}*, is thinking on where to begin to help…`);
+}
+
+// Render chat message
+function addMessage(sender, text) {
+  const message = document.createElement('div');
+  message.className = `message ${sender}`;
+  message.textContent = text;
+  chatThread.appendChild(message);
+  chatThread.scrollTop = chatThread.scrollHeight;
+}
+
+// Handle chat submission
+chatForm.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const userMessage = input.value.trim();
-  if (!userMessage) return;
+  const input = userInput.value.trim();
+  if (!input) return;
 
-  addMessageToChat('user', userMessage);
-  input.value = '';
+  // Add user message
+  addMessage('user', input);
+  userInput.value = '';
 
-  try {
-    const { aiReply, newHistory } = await sendMessageToAI(userMessage, history);
-    history = newHistory;
-    addMessageToChat('assistant', aiReply);
-  } catch (err) {
-    console.error('❌ Error from AI:', err);
-    addMessageToChat('error', 'Sorry, something went wrong.');
+  // Tag detection
+  const tags = getTagsFromMessage(input);
+  console.log('🔖 Tags:', tags);
+
+  // Generate simple AI reply
+  const aiResponse = `Thanks for sharing. Let's explore how we can address that. (Coach: ${selectedCoach?.name})`;
+  addMessage('ai', aiResponse);
+
+  // Log to Supabase
+  const { error } = await supabase.from('qa').insert([
+    {
+      user_message: input,
+      ai_response: aiResponse,
+      tags: tags.join(', ')
+    }
+  ]);
+
+  if (error) {
+    console.error('❌ Error logging to Supabase:', error.message);
+  } else {
+    console.log('✅ Logged message to Supabase');
   }
 });
 
-async function sendMessageToAI(userInput, history) {
-  const user = await supabase.auth.getUser();
-  const sessionId = user.data?.user?.id || 'anonymous';
-
-  const payload = {
-    prompt: systemPrompt,
-    history: [...history, { role: 'user', content: userInput }],
-    sessionId,
-  };
-
-  const response = await fetch('/api/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) throw new Error(data.error || 'AI call failed');
-
-  return {
-    aiReply: data.reply,
-    newHistory: [...payload.history, { role: 'assistant', content: data.reply }],
-  };
-}
-
-function addMessageToChat(role, content) {
-  const bubble = document.createElement('div');
-  bubble.className = `bubble ${role}`;
-  bubble.textContent = content;
-  chatContainer.appendChild(bubble);
-  chatContainer.scrollTop = chatContainer.scrollHeight;
-}
+// Init
+renderCoachButtons();
