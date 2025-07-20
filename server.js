@@ -1,107 +1,45 @@
-// Use the modern `import` syntax
+// === Imports ===
 import express from 'express';
 import path from 'path';
 import { config } from 'dotenv';
 import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
 
-// ==== Initialize API Keys ====
+// === Setup ===
 config();
+const app = express();
 const PORT = process.env.PORT || 3000;
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
-// ==== Initialize OpenAI ====
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
-// ==== Initialize Supabase ====
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-// ==== Middleware ====
-const app = express();
+// === Middleware ===
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// ==== Tagging Logic ====
-function getTagFromMessage(message = '') {
-  const msg = message.toLowerCase();
-  if (msg.includes('overwhelm') || msg.includes('burnout') || msg.includes('too much')) return 'overwhelm';
-  if (msg.includes('conflict') || msg.includes('pushback') || msg.includes('resistance')) return 'conflict';
-  if (msg.includes('goal') || msg.includes('vision') || msg.includes('outcome')) return 'goal-setting';
-  if (msg.includes('reset') || msg.includes('start over')) return 'reset-requested';
+// === Helper: Tagging Logic ===
+function getTagForMessage(message) {
+  const text = message.toLowerCase();
+
+  if (text.includes('overwhelm') || text.includes('too much')) return 'overwhelm';
+  if (text.includes('conflict') || text.includes('pushback') || text.includes('tension')) return 'conflict';
+  if (text.includes('goal') || text.includes('priority') || text.includes('focus')) return 'goal-setting';
+  if (text.includes('reset') || text.includes('start over')) return 'reset';
+  if (!text || text === 'empty_followup') return 'follow-up';
+
   return 'follow-up';
 }
 
-// ==== API Route ====
-app.post('/api/chat', async (req, res) => {
-  try {
-    const { prompt, history } = req.body;
-
-    if (!prompt || !history) {
-      return res.status(400).json({ error: 'Prompt and history are required.' });
-    }
-
-    let messages = [];
-    let tag = 'follow-up';
-    let userMessage = '';
-
-    if (history.length === 1 && history[0].role === 'user') {
-      userMessage = history[0].content || 'EMPTY_FIRST';
-      tag = 'first-turn';
-      const initialPrompt = `System: Your new user has just started the session. Their opening message is: "${userMessage}". You must now begin the coaching process by asking your scripted first question as instructed in your rules.`;
-      messages = [
-        { role: 'system', content: initialPrompt },
-        ...history,
-      ];
-    } else {
-      const userMessages = history.filter(msg => msg.role === 'user' && msg.content?.trim());
-      userMessage = userMessages.length > 0 ? userMessages[userMessages.length - 1].content : 'EMPTY_FOLLOWUP';
-      tag = getTagFromMessage(userMessage);
-
-      messages = [
-        { role: 'system', content: prompt },
-        ...history,
-      ];
-    }
-
-    console.log('🟡 USER MESSAGE FOR TAGGING:', userMessage);
-    console.log('🟢 TAG SELECTED:', tag);
-
-    // Call OpenAI
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: messages,
-    });
-
-    const reply = completion.choices[0].message.content;
-
-    // ✅ Log conversation to Supabase
-    await logConversationToSupabase({
-      sessionId: 'anonymous', // Replace with real session ID logic later
-      userMessage,
-      aiResponse: reply,
-      tags: tag,
-    });
-
-    res.json({ reply });
-  } catch (error) {
-    console.error('⚠️ Error:', error);
-    res.status(500).json({ error: 'Failed to get response from AI.' });
-  }
-});
-
-// ==== Supabase Logging Function ====
-async function logConversationToSupabase({ sessionId, userMessage, aiResponse, tags = '' }) {
+// === Helper: Supabase Logging ===
+async function logConversation({ sessionId, userMessage, aiResponse, tag }) {
   try {
     const { error } = await supabase.from('QA').insert([
       {
         session_id: sessionId,
         user_message: userMessage,
         ai_response: aiResponse,
-        tags: tags,
+        tags: tag,
       },
     ]);
     if (error) throw error;
@@ -111,7 +49,52 @@ async function logConversationToSupabase({ sessionId, userMessage, aiResponse, t
   }
 }
 
-// ==== Start the server ====
+// === API Route ===
+app.post('/api/chat', async (req, res) => {
+  try {
+    const { prompt, history } = req.body;
+    if (!prompt || !history) {
+      return res.status(400).json({ error: 'Prompt and history are required.' });
+    }
+
+    // Determine message context
+    const isFirstTurn = history.length === 1 && history[0].role === 'user';
+    const userMessage = isFirstTurn
+      ? history[0].content
+      : (history.slice().reverse().find(m => m.role === 'user')?.content || 'EMPTY_FOLLOWUP');
+
+    const messages = isFirstTurn
+      ? [{ role: 'system', content: `System: User just started a session. Opening message: "${userMessage}". Begin coaching.` }, ...history]
+      : [{ role: 'system', content: prompt }, ...history];
+
+    // Generate AI response
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages,
+    });
+    const reply = completion.choices[0].message.content;
+
+    // Tag logic
+    const tag = isFirstTurn ? 'first-turn' : getTagForMessage(userMessage);
+    console.log('🟡 USER MESSAGE FOR TAGGING:', userMessage);
+    console.log('🟢 TAG SELECTED:', tag);
+
+    // Log to Supabase
+    await logConversation({
+      sessionId: 'anonymous',
+      userMessage,
+      aiResponse: reply,
+      tag,
+    });
+
+    res.json({ reply });
+  } catch (error) {
+    console.error('⚠️ AI Error:', error);
+    res.status(500).json({ error: 'Failed to get response from AI.' });
+  }
+});
+
+// === Start Server ===
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
 });
