@@ -37,7 +37,7 @@ app.post('/api/chat', async (req, res) => {
     let userMessage = '';
     let tag = '';
 
-    // First message case
+    // ==== First Message Case ====
     if (history.length === 1 && history[0].role === 'user') {
       const userFirstMessage = history[0].content;
       userMessage = userFirstMessage;
@@ -50,10 +50,17 @@ app.post('/api/chat', async (req, res) => {
         ...history,
       ];
     } else {
-      // Follow-up case
+      // ==== Follow-up Case ====
       const historyCopy = [...history];
-      const latestUserMessage = [...historyCopy].reverse().find(m => m.role === 'user');
-      userMessage = latestUserMessage?.content || 'EMPTY_FOLLOWUP';
+      const userMessages = historyCopy.filter(m => m.role === 'user');
+
+      if (userMessages.length > 0) {
+        userMessage = userMessages[userMessages.length - 1].content;
+      } else {
+        console.warn('⚠️ No user messages found in history!');
+        userMessage = 'UNKNOWN';
+      }
+
       tag = 'follow-up';
 
       messages = [
@@ -62,11 +69,11 @@ app.post('/api/chat', async (req, res) => {
       ];
     }
 
-    // 🧪 Log what’s going on (debug only, safe to remove later)
+    // ==== Debug Logs ====
     console.log('🟢 USER MESSAGE FOR TAGGING:', userMessage);
     console.log('🏷️ TAG SELECTED:', tag);
 
-    // Call OpenAI
+    // ==== Call OpenAI ====
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: messages,
@@ -74,7 +81,7 @@ app.post('/api/chat', async (req, res) => {
 
     const reply = completion.choices[0].message.content;
 
-    // ✅ Log to Supabase
+    // ==== Log to Supabase ====
     await logConversationToSupabase({
       sessionId: 'anonymous',
       userMessage,
@@ -107,7 +114,7 @@ async function logConversationToSupabase({ sessionId, userMessage, aiResponse, t
   }
 }
 
-// ==== Start the server ====
+// ==== Start the Server ====
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
 });
