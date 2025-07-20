@@ -1,24 +1,25 @@
-// Import the Supabase client library from CDN
+// Import Supabase client from CDN
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 
-// These are your project credentials
+// ✅ REPLACE THIS WITH YOUR *CURRENT* ANON KEY FROM Supabase → Project Settings > API
 const supabaseUrl = 'https://zmehmjwlzahsuvrmtqel.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'; // ✅ Already obfuscated in your previous code
+const supabaseKey = 'YOUR_ANON_PUBLIC_KEY_HERE';  // ← replace this!
 
-// Create and export Supabase client for auth.js and ai.js
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
-// DOM references
+// DOM elements
 const form = document.querySelector('#chat-form');
 const input = document.querySelector('#user-input');
 const chatContainer = document.getElementById('chat');
+
 let history = [];
 
-// System message (reminder to AI how to behave)
+// SYSTEM DESCRIPTION SENT ON EVERY MESSAGE
 const systemPrompt = "This neuro-informed AI Executive Coach helps users explore tensions, clarify goals, and engage in thoughtful reflection through one question at a time. Always respond as a coach, not a consultant.";
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
+
   const userMessage = input.value.trim();
   if (!userMessage) return;
 
@@ -48,6 +49,7 @@ async function sendMessageToAI(userInput, history) {
   });
 
   const data = await response.json();
+
   if (!response.ok) throw new Error(data.error || 'AI call failed');
 
   return {
