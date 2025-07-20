@@ -4,66 +4,63 @@ import { config } from 'dotenv';
 import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
 
-// ==== Load .env variables ====
 config();
 const PORT = process.env.PORT || 3000;
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
-// ==== OpenAI ====
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
-// ==== Supabase ====
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-// ==== Express App ====
 const app = express();
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// ==== Main Chat Endpoint ====
 app.post('/api/chat', async (req, res) => {
   try {
-    const { prompt, history } = req.body;
+    const { prompt, history, user_input } = req.body;
 
-    if (!prompt || !history) {
-      return res.status(400).json({ error: 'Prompt and history are required.' });
+    if (!prompt || !history || !user_input) {
+      return res.status(400).json({ error: 'Prompt, history, and user input are required.' });
     }
 
-    const historyCopy = [...history];
-    const latestUserMessage = [...historyCopy].reverse().find(m => m.role === 'user');
-    const userMessage = latestUserMessage?.content || 'UNKNOWN';
+    let tag = '';
+    let userMessage = user_input?.trim() || 'UNKNOWN';
+    let messages = [];
 
-    const messages = [
-      { role: 'system', content: prompt },
-      ...historyCopy,
-    ];
+    if (history.length === 1 && history[0].role === 'user') {
+      tag = 'first-turn';
+      messages = [
+        {
+          role: 'system',
+          content: `System: Your new user has just started the session. Their opening message is: "${userMessage}". You must now begin the coaching process by asking your scripted first question as instructed in your rules.`,
+        },
+        ...history,
+      ];
+    } else {
+      tag = 'follow-up';
+      messages = [
+        { role: 'system', content: prompt },
+        ...history,
+      ];
+    }
 
-    // 🧠 Ask GPT to classify user message into a smart tag
-    const tagClassifier = await openai.chat.completions.create({
+    // 🧠 GPT-powered smart tagging
+    const tagResponse = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
         {
           role: 'system',
-          content: "You are a classification assistant. Return one lowercase tag that best fits the user's message. Choose from: overwhelm, conflict, goals, clarity, feedback, motivation, reflection, unknown.",
+          content: `You are a tagger for an executive coach. Return 1–3 lowercase tags (comma-separated) that best describe the user's message below. Possible tags: overwhelm, goals, conflict, clarity, resistance, burnout, progress, motivation, alignment, values. Just return tags, nothing else.`,
         },
-        {
-          role: 'user',
-          content: userMessage,
-        },
+        { role: 'user', content: userMessage },
       ],
-      max_tokens: 10,
     });
 
-    const tag = tagClassifier.choices[0].message.content.trim().toLowerCase();
+    const smartTags = tagResponse.choices[0].message.content.trim();
 
-    // 🤖 Get assistant response
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
-      messages,
+      messages: messages,
     });
 
     const reply = completion.choices[0].message.content;
@@ -73,17 +70,16 @@ app.post('/api/chat', async (req, res) => {
       sessionId: 'anonymous',
       userMessage,
       aiResponse: reply,
-      tags: tag,
+      tags: `${tag} | ${smartTags}`,
     });
 
     res.json({ reply });
   } catch (error) {
-    console.error('⚠️ Chat error:', error);
+    console.error('⚠️ Error:', error);
     res.status(500).json({ error: 'Failed to get response from AI.' });
   }
 });
 
-// ==== Supabase Logger ====
 async function logConversationToSupabase({ sessionId, userMessage, aiResponse, tags }) {
   try {
     const { error } = await supabase.from('QA').insert([
@@ -101,7 +97,6 @@ async function logConversationToSupabase({ sessionId, userMessage, aiResponse, t
   }
 }
 
-// ==== Start Server ====
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server is running on http://localhost:${PORT}`);
 });
