@@ -1,9 +1,55 @@
-// Import the Supabase client library from a CDN
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+const form = document.querySelector('form');
+const input = document.querySelector('input');
+const chatContainer = document.getElementById('chat');
+let history = [];
 
-// These are your project credentials
-const supabaseUrl = 'https://zmehmjwlzahsuvrmtqel.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptZWhtandsemFoc3V2cm10cWVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4MjA0NDUsImV4cCI6MjA2NjM5NjQ0NX0.BDvCG-WLrdJ6ZkTzG2TSrXJwaFz2Kom7jmt3o217ixE';
+// SYSTEM DESCRIPTION SENT ON EVERY MESSAGE
+const systemPrompt = "This neuro-informed AI Executive Coach helps users explore tensions, clarify goals, and engage in thoughtful reflection through one question at a time. Always respond as a coach, not a consultant.";
 
-// Create the Supabase client and export it so other files can use it
-export const supabase = createClient(supabaseUrl, supabaseKey);
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const userMessage = input.value.trim();
+  if (!userMessage) return;
+
+  addMessageToChat('user', userMessage);
+  input.value = '';
+
+  try {
+    const { aiReply, newHistory } = await sendMessageToAI(userMessage, history);
+    history = newHistory;
+    addMessageToChat('assistant', aiReply);
+  } catch (err) {
+    console.error('❌ Error from AI:', err);
+    addMessageToChat('error', 'Sorry, something went wrong.');
+  }
+});
+
+async function sendMessageToAI(userInput, history) {
+  const payload = {
+    prompt: systemPrompt,
+    history: [...history, { role: 'user', content: userInput }],
+  };
+
+  const response = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) throw new Error(data.error || 'AI call failed');
+
+  return {
+    aiReply: data.reply,
+    newHistory: [...payload.history, { role: 'assistant', content: data.reply }],
+  };
+}
+
+function addMessageToChat(role, content) {
+  const bubble = document.createElement('div');
+  bubble.className = `bubble ${role}`;
+  bubble.textContent = content;
+  chatContainer.appendChild(bubble);
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+}
