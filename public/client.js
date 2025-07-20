@@ -1,63 +1,91 @@
-// ✅ Supabase Client Setup (ESM-compatible)
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+import { supabase } from './client.js';
 
-// Replace with your actual Supabase project URL and anon key
-const supabaseUrl = 'https://zmehmjwlzahsuvrmtqel.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptZWhtandsemFoc3V2cm10cWVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4MjA0NDUsImV4cCI6MjA2NjM5NjQ0NX0.BDvCG-WLrdJ6ZkTzG2TSrXJwaFz2Kom7jmt3o217ixE';
-export const supabase = createClient(supabaseUrl, supabaseKey);
+const gemSelection = document.getElementById('gem-selection');
+const chatWindow = document.getElementById('chat-window');
+const chatForm = document.getElementById('chat-form');
+const chatThread = document.getElementById('chat');
+const userInput = document.getElementById('user-input');
+const micButton = document.getElementById('mic-button');
 
-// ✅ Chat Logic
-const form = document.querySelector('#chat-form');
-const input = document.querySelector('#user-input');
-const chatContainer = document.getElementById('chat');
-let history = [];
+let selectedGem = null;
+let messageHistory = [];
 
-// System prompt that defines the AI's behavior
-const systemPrompt = "This neuro-informed AI Executive Coach helps users explore tensions, clarify goals, and engage in thoughtful reflection through one question at a time. Always respond as a coach, not a consultant.";
+async function loadGemPrompt() {
+  const { data, error } = await supabase
+    .from('gems')
+    .select('*')
+    .eq('id', 1)
+    .single();
 
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const userMessage = input.value.trim();
-  if (!userMessage) return;
-
-  addMessageToChat('user', userMessage);
-  input.value = '';
-
-  try {
-    const { aiReply, newHistory } = await sendMessageToAI(userMessage, history);
-    history = newHistory;
-    addMessageToChat('assistant', aiReply);
-  } catch (err) {
-    console.error('❌ Error from AI:', err);
-    addMessageToChat('error', 'Sorry, something went wrong.');
+  if (error) {
+    console.error('Error loading gem:', error.message);
+    return;
   }
-});
 
-async function sendMessageToAI(userInput, history) {
+  selectedGem = data;
+  const intro = document.createElement('div');
+  intro.className = 'ai-message';
+  intro.innerText = `${data.description} ${data.prompt}
+
+What's on your mind?`;
+  chatThread.appendChild(intro);
+  chatWindow.style.display = 'block';
+}
+
+async function sendMessageToAI(userMessage) {
+  const prompt = selectedGem?.prompt || '';
   const payload = {
-    prompt: systemPrompt,
-    history: [...history, { role: 'user', content: userInput }],
+    prompt,
+    user_input: userMessage,
+    history: messageHistory
   };
 
-  const response = await fetch('/api/chat', {
+  const response = await fetch('/api/chat1', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(payload)
   });
 
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'AI call failed');
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error('AI Error: ' + err);
+  }
 
-  return {
-    aiReply: data.reply,
-    newHistory: [...payload.history, { role: 'assistant', content: data.reply }],
-  };
+  const { assistant } = await response.json();
+  return assistant;
 }
 
-function addMessageToChat(role, content) {
-  const bubble = document.createElement('div');
-  bubble.className = `bubble ${role}`;
-  bubble.textContent = content;
-  chatContainer.appendChild(bubble);
-  chatContainer.scrollTop = chatContainer.scrollHeight;
-}
+chatForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const message = userInput.value.trim();
+  if (!message) return;
+
+  const userDiv = document.createElement('div');
+  userDiv.className = 'user-message';
+  userDiv.innerText = message;
+  chatThread.appendChild(userDiv);
+
+  userInput.value = '';
+  userInput.disabled = true;
+
+  try {
+    const aiReply = await sendMessageToAI(message);
+    messageHistory.push({ role: 'user', content: message });
+    messageHistory.push({ role: 'assistant', content: aiReply });
+
+    const aiDiv = document.createElement('div');
+    aiDiv.className = 'ai-message';
+    aiDiv.innerText = aiReply;
+    chatThread.appendChild(aiDiv);
+  } catch (err) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'ai-message';
+    errorDiv.innerText = 'Something went wrong.';
+    chatThread.appendChild(errorDiv);
+    console.error(err);
+  }
+
+  userInput.disabled = false;
+});
+
+loadGemPrompt();
