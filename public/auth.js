@@ -1,4 +1,4 @@
-import { supabase } from './client.js';
+import supabase from './supabase.js';
 
 const loginButton = document.getElementById('login-button');
 const signupButton = document.getElementById('signup-button');
