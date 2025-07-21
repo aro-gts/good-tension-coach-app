@@ -1,32 +1,42 @@
+import { supabase } from './supabase.js';
 
-import './auth.js';
-import { logMessage } from './ai.js';
+const loginScreen = document.getElementById("login-screen");
+const appScreen = document.getElementById("app-screen");
+const loginButton = document.getElementById("login-button");
+const signupButton = document.getElementById("signup-button");
+const logoutButton = document.getElementById("logout-button");
+const emailInput = document.getElementById("email-input");
+const passwordInput = document.getElementById("password-input");
 
-window.addEventListener('DOMContentLoaded', async () => {
-  const chatContainer = document.getElementById('chat-container');
-  const sendBtn = document.getElementById('send-button');
-  const userInput = document.getElementById('user-input');
-
-  if (sendBtn && userInput && chatContainer) {
-    sendBtn.addEventListener('click', async () => {
-      const message = userInput.value.trim();
-      if (!message) return;
-      userInput.value = '';
-      const userDiv = document.createElement('div');
-      userDiv.className = 'user-message';
-      userDiv.textContent = message;
-      chatContainer.appendChild(userDiv);
-
-      const response = await fetch('/api/chat1', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message })
-      });
-      const data = await response.json();
-      const aiDiv = document.createElement('div');
-      aiDiv.className = 'ai-message';
-      aiDiv.textContent = data.reply;
-      chatContainer.appendChild(aiDiv);
-    });
-  }
+loginButton.addEventListener("click", async () => {
+  const email = emailInput.value;
+  const password = passwordInput.value;
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) return alert(error.message);
+  loginScreen.style.display = "none";
+  appScreen.style.display = "block";
 });
+
+signupButton.addEventListener("click", async () => {
+  const email = emailInput.value;
+  const password = passwordInput.value;
+  const { error } = await supabase.auth.signUp({ email, password });
+  if (error) return alert(error.message);
+  alert("Check your email for a confirmation link.");
+});
+
+logoutButton.addEventListener("click", async () => {
+  await supabase.auth.signOut();
+  appScreen.style.display = "none";
+  loginScreen.style.display = "block";
+});
+
+const checkLogin = async () => {
+  const { data } = await supabase.auth.getSession();
+  if (data.session) {
+    loginScreen.style.display = "none";
+    appScreen.style.display = "block";
+  }
+};
+
+checkLogin();
